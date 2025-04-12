@@ -42,9 +42,13 @@ export default function AnnotationDisplay({ boxId }: { boxId: string }) {
   const [isHoveringStartPoint, setIsHoveringStartPoint] = useState(false);
   const [hoveredLineIndex, setHoveredLineIndex] = useState<number | null>(null);
 
-  const points = activeSource?.annotation?.points ?? [];
+  // const points = activeSource?.annotation?.points ?? [];
+  const points = useMemo(() => activeSource?.annotation?.points ?? [], [activeSource?.annotation?.points]);
+
   const isClosed = activeSource?.annotation?.isClosed ?? false;
-  const selectedLineIndices = activeSource?.annotation?.selectedLineIndices ?? [];
+  // const selectedLineIndices = activeSource?.annotation?.selectedLineIndices ?? [];
+  const selectedLineIndices = useMemo(() => activeSource?.annotation?.selectedLineIndices ?? [], [activeSource?.annotation?.selectedLineIndices]);
+
   const canDraw = annotationMode === 'drawing' && !!activeSource && !isClosed && !activeSource.status.startsWith('error') && activeSource.status !== 'streaming' && activeSource.status !== 'analyzing';
   const canSelectLines = annotationMode === 'line_selection' && !!activeSource && isClosed && !activeSource.status.startsWith('error') && activeSource.status !== 'streaming' && activeSource.status !== 'analyzing';
 

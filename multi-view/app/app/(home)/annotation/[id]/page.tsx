@@ -1,9 +1,10 @@
 import AnnotationDisplay from "@/components/customer-flow/annotation-display";
 
-export default function Page({ params }: { params: { id: string } }) {
+export default async function Page({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   return (
     <div className="w-full h-full">
-      <AnnotationDisplay boxId={params.id} />
+      <AnnotationDisplay boxId={id} />
     </div>
   )
 }
