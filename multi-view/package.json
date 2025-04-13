@@ -23,13 +23,18 @@
     "@radix-ui/react-switch": "^1.1.4",
     "@radix-ui/react-tabs": "^1.1.4",
     "@radix-ui/react-tooltip": "^1.2.0",
+    "canvas": "^3.1.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+<<<<<<< Updated upstream
     "date-fns": "^4.1.0",
+=======
+>>>>>>> Stashed changes
     "immer": "^10.1.1",
     "konva": "^9.3.20",
     "lucide-react": "^0.487.0",
     "next": "15.3.0",
+    "pm2": "^6.0.5",
     "react": "^19.0.0",
     "react-day-picker": "8.10.1",
     "react-dom": "^19.0.0",
