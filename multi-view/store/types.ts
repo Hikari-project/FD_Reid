@@ -10,7 +10,10 @@ export interface Annotation {
   // Stores indices of the *starting point* of selected lines.
   // e.g., [0, 3] means line 0-1 and line 3-4 are selected.
   selectedLineIndices: number[];
+  zoneType?: 'inside' | 'outside' | null; // Renamed from areaType
 }
+
+export type ZoneType = 'inside' | 'outside' | null; // Add ZoneType definition
 
 export type SourceStatus =
   | 'idle' // Initial state
@@ -65,6 +68,7 @@ export interface AppActions {
   clearAnnotation: (url: string) => void;
   closePolygon: (url: string) => void;
   toggleLineSelection: (url: string, lineIndex: number) => void; // Index of the starting point of the line
+  setZoneType: (url: string, type: 'inside' | 'outside') => void; // Renamed from setAreaType
 
   // --- Analysis ---
   startAnalysis: (url: string) => Promise<void>;

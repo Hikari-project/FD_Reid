@@ -8,12 +8,15 @@ import useImage from 'use-image';
 import ConfigHeader from '@/components/customer-flow/config-header';
 import ConfigSidebar from '@/components/customer-flow/config-sidbar';
 
-import { selectActiveSourceData, useAppStore } from '@/store/useCustomerAnalysis';
-import type { Point } from '@/store/types';
+import {
+  selectActiveSourceData,
+  useAppStore,
+  selectActiveZoneType,
+} from '@/store/useCustomerAnalysis';
+import type { Point, Annotation, ZoneType } from '@/store/types';
 
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import Image from 'next/image';
 
 const LINE_STROKE_WIDTH = 3;
 const SELECTED_LINE_STROKE_WIDTH = 5;
@@ -32,6 +35,8 @@ export default function AnnotationDisplay({ boxId }: { boxId: string }) {
   const addAnnotationPoint = useAppStore(state => state.addAnnotationPoint);
   const closePolygon = useAppStore(state => state.closePolygon);
   const toggleLineSelection = useAppStore(state => state.toggleLineSelection);
+  const setZoneType = useAppStore(state => state.setZoneType);
+  const zoneType = useAppStore(selectActiveZoneType);
 
   const stageRef = useRef<Konva.Stage>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -42,12 +47,11 @@ export default function AnnotationDisplay({ boxId }: { boxId: string }) {
   const [isHoveringStartPoint, setIsHoveringStartPoint] = useState(false);
   const [hoveredLineIndex, setHoveredLineIndex] = useState<number | null>(null);
 
-  // const points = activeSource?.annotation?.points ?? [];
   const points = useMemo(() => activeSource?.annotation?.points ?? [], [activeSource?.annotation?.points]);
 
   const isClosed = activeSource?.annotation?.isClosed ?? false;
-  // const selectedLineIndices = activeSource?.annotation?.selectedLineIndices ?? [];
   const selectedLineIndices = useMemo(() => activeSource?.annotation?.selectedLineIndices ?? [], [activeSource?.annotation?.selectedLineIndices]);
+  const annotation = useMemo(() => activeSource?.annotation, [activeSource?.annotation]) as Annotation | undefined;
 
   const canDraw = annotationMode === 'drawing' && !!activeSource && !isClosed && !activeSource.status.startsWith('error') && activeSource.status !== 'streaming' && activeSource.status !== 'analyzing';
   const canSelectLines = annotationMode === 'line_selection' && !!activeSource && isClosed && !activeSource.status.startsWith('error') && activeSource.status !== 'streaming' && activeSource.status !== 'analyzing';
@@ -154,6 +158,15 @@ export default function AnnotationDisplay({ boxId }: { boxId: string }) {
        }
    }, [canSelectLines]);
 
+   const handleZoneTypeChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+       if (!activeSource?.url || !canSelectLines) return;
+       const selectedType = event.target.value as 'inside' | 'outside';
+       setZoneType(activeSource.url, selectedType);
+       toast.info(`区域类型设置为: ${selectedType === 'inside' ? '店内' : '店外'}`);
+   }, [activeSource?.url, canSelectLines, setZoneType]);
+
+   const polygonFillColor = useMemo(() => zoneType === 'inside' ? 'rgba(0, 255, 0, 0.3)' : zoneType === 'outside' ? 'rgba(255, 0, 0, 0.3)' : 'transparent', [zoneType]);
+
   const content = useMemo(() => {
     if (!activeSource) {
       return <div className="text-gray-500 text-center p-10">请从侧边栏选择一个 RTSP 流源开始。</div>;
@@ -174,6 +187,33 @@ export default function AnnotationDisplay({ boxId }: { boxId: string }) {
 
     return (
       <div className="relative w-full h-full bg-gray-900">
+        {canSelectLines && (
+          <div className="absolute top-2 left-2 z-20 bg-white/80 backdrop-blur-sm p-2 rounded-md shadow text-sm">
+            <p className="font-medium mb-1">选择区域类型:</p>
+            <div className="flex gap-4">
+              <label className="flex items-center gap-1 cursor-pointer">
+                <input
+                  type="radio"
+                  name={`zoneType-${activeSource.url}`}
+                  value="inside"
+                  checked={zoneType === 'inside'}
+                  onChange={handleZoneTypeChange}
+                />
+                店内 (Inside)
+              </label>
+              <label className="flex items-center gap-1 cursor-pointer">
+                <input
+                  type="radio"
+                  name={`zoneType-${activeSource.url}`}
+                  value="outside"
+                  checked={zoneType === 'outside'}
+                  onChange={handleZoneTypeChange}
+                />
+                店外 (Outside)
+              </label>
+            </div>
+          </div>
+        )}
         {activeSource.status === 'streaming' && activeSource.mjpegStreamUrl && (
             <img
                 src={activeSource.mjpegStreamUrl}
@@ -214,11 +254,12 @@ export default function AnnotationDisplay({ boxId }: { boxId: string }) {
                 <Line
                     points={points.flatMap((p: Point) => [p.x, p.y])}
                     stroke={LINE_COLOR}
-                    strokeWidth={LINE_STROKE_WIDTH / scale}
+                    strokeWidth={(isClosed ? LINE_STROKE_WIDTH : LINE_STROKE_WIDTH) / scale}
                     closed={isClosed}
                     lineCap="round"
                     lineJoin="round"
                     listening={false}
+                    fill={isClosed ? polygonFillColor : 'transparent'}
                 />
             )}
 
@@ -232,8 +273,8 @@ export default function AnnotationDisplay({ boxId }: { boxId: string }) {
                     <Line
                         key={`select-line-${activeSource.url}-${index}`}
                         points={[startPoint.x, startPoint.y, endPoint.x, endPoint.y]}
-                        stroke={isSelected ? SELECTED_LINE_COLOR : (isHovered ? HOVER_LINE_COLOR : 'transparent')} // Show selection/hover
-                        strokeWidth={(isSelected ? SELECTED_LINE_STROKE_WIDTH : HIT_STROKE_WIDTH) / scale } // Wider hit area, thinner if selected
+                        stroke={isSelected ? SELECTED_LINE_COLOR : (isHovered ? HOVER_LINE_COLOR : 'transparent')}
+                        strokeWidth={(isSelected ? SELECTED_LINE_STROKE_WIDTH : HIT_STROKE_WIDTH) / scale }
                         hitStrokeWidth={HIT_STROKE_WIDTH / scale} 
                         listening={canSelectLines}
                         onClick={() => handleLineClick(index)}
@@ -271,6 +312,8 @@ export default function AnnotationDisplay({ boxId }: { boxId: string }) {
     scale, 
     points, 
     isClosed, 
+    zoneType,
+    polygonFillColor,
     selectedLineIndices, 
     hoveredLineIndex,
     canDraw,
@@ -278,6 +321,7 @@ export default function AnnotationDisplay({ boxId }: { boxId: string }) {
     isHoveringStartPoint,
     handleStageMouseDown,
     handleLineClick,
+    handleZoneTypeChange,
     handleStartDotMouseEnter,
     handleStartDotMouseLeave,
     handleLineHover
