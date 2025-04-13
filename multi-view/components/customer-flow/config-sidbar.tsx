@@ -51,7 +51,7 @@ export default function ConfigSidebar() {
   };
 
   return (
-    <div className="w-72 h-full bg-white rounded-md shadow-sm pt-4 flex flex-col">
+    <div className="w-72 h-full bg-white rounded-md shadow-sm pt-4 flex flex-col overflow-y-auto">
       <h3 className="font-medium text-lg text-gray-700 w-full mb-2 px-4">RTSP 流源</h3>
 
       {sources.length === 0 ? (
@@ -60,7 +60,7 @@ export default function ConfigSidebar() {
         </div>
       ) : (
         <div className="w-full space-y-2 overflow-y-auto flex-1 px-3 pb-3">
-          {sources.map((source) => (
+          {sources.map((source) => source.url !== 'error' && (
             <div
               key={source.url}
               className={cn(

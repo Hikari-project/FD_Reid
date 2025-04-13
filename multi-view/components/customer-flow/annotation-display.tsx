@@ -24,8 +24,8 @@ const HIT_STROKE_WIDTH = 10;
 const DOT_RADIUS = 6;
 const DOT_FILL_COLOR = '#ffea00';
 const DOT_HOVER_FILL_COLOR = '#ff8c00';
-const LINE_COLOR = '#ff0000';
-const SELECTED_LINE_COLOR = '#0000ff';
+const LINE_COLOR = '#00ff00';
+const SELECTED_LINE_COLOR = '#ff0000';
 const HOVER_LINE_COLOR = '#add8e6';
 const CLOSING_THRESHOLD = 15;
 
@@ -165,7 +165,7 @@ export default function AnnotationDisplay({ boxId }: { boxId: string }) {
        toast.info(`区域类型设置为: ${selectedType === 'inside' ? '店内' : '店外'}`);
    }, [activeSource?.url, canSelectLines, setZoneType]);
 
-   const polygonFillColor = useMemo(() => zoneType === 'inside' ? 'rgba(0, 255, 0, 0.3)' : zoneType === 'outside' ? 'rgba(255, 0, 0, 0.3)' : 'transparent', [zoneType]);
+   const polygonFillColor = useMemo(() => zoneType === 'inside' ? 'rgba(0, 255, 0, 0.3)' : zoneType === 'outside' ? 'rgba(255, 255, 0, 0.3)' : 'transparent', [zoneType]);
 
   const content = useMemo(() => {
     if (!activeSource) {
@@ -214,13 +214,19 @@ export default function AnnotationDisplay({ boxId }: { boxId: string }) {
             </div>
           </div>
         )}
-        {activeSource.status === 'streaming' && activeSource.mjpegStreamUrl && (
+        {activeSource.status === 'streaming' && activeSource.mjpegStreamUrl && activeSource.mjpegStreamUrl !== 'error' && (
             <img
                 src={activeSource.mjpegStreamUrl}
                 // src={"http://localhost:8003/video_feed"}
                 alt="MJPEG 流"
                 className="absolute top-0 left-0 w-full h-full object-contain z-0" 
             />
+        )}
+        {activeSource.status === 'streaming' && activeSource.mjpegStreamUrl && activeSource.mjpegStreamUrl === 'error' && (
+            <div className="text-red-600 text-center p-10 flex flex-col items-center justify-center">
+                <p className="font-semibold text-lg mb-2">错误</p>
+                <p>无法连接到 RTSP 流。请检查流地址是否正确。</p>
+            </div>
         )}
        
         <Stage

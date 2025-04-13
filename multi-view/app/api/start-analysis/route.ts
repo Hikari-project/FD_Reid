@@ -25,9 +25,28 @@ export async function POST(request: Request) {
     await delay(1500); // Simulate 1.5 seconds processing
 
     // 4. Construct the successful response with the fixed MJPEG URL
-    const responseData = {
-      mjpegStreamUrl: 'http://47.97.71.139:8003/video_feed', // Your fixed stream URL
-    };
+    let responseData;
+    if (rtsp_address === 'rtsp://47.97.71.139:8003/video_feed1') {
+      responseData = {
+        mjpegStreamUrl: 'http://47.97.71.139:8003/video_feed1', // Your fixed stream URL
+      };
+    } else if (rtsp_address === 'rtsp://47.97.71.139:8003/video_feed2') {
+      responseData = {
+        mjpegStreamUrl: 'http://47.97.71.139:8003/video_feed2', // Your fixed stream URL
+      };
+    } else if (rtsp_address === 'rtsp://47.97.71.139:8003/video_feed3') {
+      responseData = {
+        mjpegStreamUrl: 'http://47.97.71.139:8003/video_feed3', // Your fixed stream URL
+      };
+    } else if (rtsp_address === 'rtsp://47.97.71.139:8003/video_feed4') {
+      responseData = {
+        mjpegStreamUrl: 'http://47.97.71.139:8003/video_feed4', // Your fixed stream URL
+      };
+    } else {
+      responseData = {
+        mjpegStreamUrl: 'error', // Your fixed stream URL
+      };
+    }
 
     // 5. Return the successful JSON response
     return NextResponse.json(responseData);
