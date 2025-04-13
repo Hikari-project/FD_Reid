@@ -18,7 +18,7 @@ export default function VideoPreview() {
     const video = document.getElementById(elementId) as HTMLImageElement
     if (!video) return
 
-    video.src = `http://47.97.71.139:8003/video_feed?t=${Date.now()}`
+    video.src = `http://47.97.71.139:8003/video_feed2`
 
     const handleLoadStart = () => {
       setRetryCount(0)

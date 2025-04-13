@@ -46,7 +46,62 @@ export default function LogManagement() {
       operator: "读宇",
       operationTime: "2025-01-05 12:01:20"
     },
-    // ... 可以添加更多示例数据
+    {
+      id: "02",
+      operationType: "用户管理",
+      operationName: "用户增删改查",
+      operationCategory: "取消异常",
+      operator: "读宇",
+      operationTime: "2025-01-05 12:01:20"
+    },
+    {
+      id: "03",
+      operationType: "终端配置",
+      operationName: "终端增删改查",  
+      operationCategory: "取消异常",
+      operator: "读宇",
+      operationTime: "2025-01-05 12:01:20"
+    },
+    {
+      id: "04",
+      operationType: "数据推送",
+      operationName: "数据推送",
+      operationCategory: "取消异常",
+      operator: "读宇",
+      operationTime: "2025-01-05 12:01:20"
+    },    
+    {
+      id: "05",
+      operationType: "视频流获取",
+      operationName: "视频流获取",
+      operationCategory: "取消异常",
+      operator: "读宇",
+      operationTime: "2025-01-05 12:01:20"
+    },
+    {
+      id: "06",
+      operationType: "视频流获取",
+      operationName: "视频流获取",
+      operationCategory: "取消异常",
+      operator: "读宇",
+      operationTime: "2025-01-05 12:01:20"
+    },
+    {
+      id: "07",
+      operationType: "视频流获取",
+      operationName: "视频流获取",
+      operationCategory: "取消异常",
+      operator: "读宇",
+      operationTime: "2025-01-05 12:01:20"
+    },
+    {
+      id: "08",
+      operationType: "视频流获取",
+      operationName: "视频流获取",  
+      operationCategory: "取消异常",
+      operator: "读宇",
+      operationTime: "2025-01-05 12:01:20"
+    },
   ])
 
   return (
