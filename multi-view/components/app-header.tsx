@@ -1,10 +1,12 @@
-// components/layout/Breadcrumbs.tsx
 'use client'
 
 import React, { useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { HomeIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
+import { CircleUserRound } from 'lucide-react';
+import { User } from 'next-auth';
+import { cn } from '@/lib/utils';
 
 interface BreadcrumbItem {
   label: string;
@@ -13,6 +15,7 @@ interface BreadcrumbItem {
 }
 
 interface BreadcrumbsProps {
+  user: User | undefined;
   pathSegmentNames?: Record<string, string>;
   homeLabel?: string;
   containerClassName?: string;
@@ -37,6 +40,7 @@ const toTitleCase = (str: string): string => {
 
 
 export function Breadcrumbs({
+  user,
   pathSegmentNames = {},
   homeLabel = "首页",
   containerClassName = "text-sm text-gray-600",
@@ -81,30 +85,39 @@ export function Breadcrumbs({
   }
 
   return (
-    <nav aria-label="Breadcrumb" className={containerClassName}>
-      <ol className={listClassName}>
-        {breadcrumbItems.map((item, index) => (
-          <li key={item.href} className={itemClassName}>
-            {index > 0 && (
-              <ChevronRightIcon className={separatorClassName} aria-hidden="true" />
-            )}
+    <div className="flex items-center justify-between">
+      <nav aria-label="Breadcrumb" className={containerClassName}>
+        <ol className={listClassName}>
+          {breadcrumbItems.map((item, index) => (
+            <li key={item.href} className={itemClassName}>
+              {index > 0 && (
+                <ChevronRightIcon className={separatorClassName} aria-hidden="true" />
+              )}
 
-            {index === 0 && (
-              <HomeIcon className={iconClassName} aria-hidden="true" />
-            )}
+              {index === 0 && (
+                <HomeIcon className={iconClassName} aria-hidden="true" />
+              )}
 
-            {item.isCurrent ? (
-              <span className="font-medium text-gray-800 ml-1" aria-current="page">
-                {item.label}
-              </span>
-            ) : (
-              <Link href={item.href} className={`${linkClassName} ml-1`}>
-                 {item.label}
-              </Link>
-            )}
-          </li>
-        ))}
-      </ol>
-    </nav>
+              {item.isCurrent ? (
+                <span className="font-medium text-gray-800 ml-1" aria-current="page">
+                  {item.label}
+                </span>
+              ) : (
+                <Link href={item.href} className={`${linkClassName} ml-1`}>
+                  {item.label}
+                </Link>
+              )}
+            </li>
+          ))}
+        </ol>
+      </nav>
+      <div className={cn(
+        'flex items-center pr-4 gap-2',
+        containerClassName
+      )}>
+        <span>用户：{user?.name}</span>
+        <CircleUserRound />
+      </div>
+    </div>
   );
 }

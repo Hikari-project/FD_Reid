@@ -1,6 +1,6 @@
 'use client'
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { 
   Sidebar, 
@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 
 export function AppSidebar() {
+  const [activeTab, setActiveTab] = useState<"video-preview" | "annotation" | "log-management">("video-preview");
+
   return (
     <Sidebar>
       <SidebarHeader>
@@ -38,8 +40,10 @@ export function AppSidebar() {
       <SidebarContent className="p-3">
         <SidebarMenu className="flex flex-col gap-4">
           <SidebarMenuItem>
-            <SidebarMenuButton asChild>
-              <Link href="/video-preview">
+            <SidebarMenuButton asChild 
+              isActive={activeTab === "video-preview"}
+            >
+              <Link href="/video-preview" onClick={() => setActiveTab("video-preview")}>
                 <MonitorIcon />
                 <span className="text-lg">视频预览</span>
               </Link>
@@ -47,17 +51,10 @@ export function AppSidebar() {
           </SidebarMenuItem>
           
           <SidebarMenuItem>
-            <SidebarMenuButton asChild>
-              <Link href="/box-management">
-                <BoxIcon />
-                <span className="text-lg">盒子管理</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild isActive={true}>
-              <Link href="/annotation">
+            <SidebarMenuButton asChild 
+              isActive={activeTab === "annotation"}
+            >
+              <Link href="/annotation" onClick={() => setActiveTab("annotation")}>
                 <BarChart2Icon />
                 <span className="text-lg">客流分析</span>
               </Link>
@@ -65,8 +62,10 @@ export function AppSidebar() {
           </SidebarMenuItem>
           
           <SidebarMenuItem>
-            <SidebarMenuButton asChild>
-              <Link href="/log-management">
+            <SidebarMenuButton asChild 
+              isActive={activeTab === "log-management"}
+            >
+              <Link href="/log-management" onClick={() => setActiveTab("log-management")}>
                 <FileTextIcon />
                 <span className="text-lg">日志管理</span>
               </Link>

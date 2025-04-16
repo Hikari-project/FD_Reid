@@ -1,7 +1,7 @@
-import BoxSelectionDisplay from "@/components/customer-flow/box-selection-display";
+import AnnotationDisplay from "@/components/customer-flow/annotation-display";
 
 export default function Page() {
   return (
-    <BoxSelectionDisplay />
+    <AnnotationDisplay />
   )
 }

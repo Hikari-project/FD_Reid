@@ -29,7 +29,7 @@ const SELECTED_LINE_COLOR = '#ff0000';
 const HOVER_LINE_COLOR = '#add8e6';
 const CLOSING_THRESHOLD = 15;
 
-export default function AnnotationDisplay({ boxId }: { boxId: string }) {
+export default function AnnotationDisplay() {
   const activeSource = useAppStore(selectActiveSourceData);
   const annotationMode = useAppStore(state => state.annotationMode);
   const addAnnotationPoint = useAppStore(state => state.addAnnotationPoint);
@@ -95,10 +95,10 @@ export default function AnnotationDisplay({ boxId }: { boxId: string }) {
     }
 
     return () => {
-       if (containerRef.current) {
+      if (containerRef.current) {
         resizeObserver.unobserve(containerRef.current);
-       }
-       resizeObserver.disconnect();
+      }
+      resizeObserver.disconnect();
     };
   }, [activeSource?.imageDimensions, activeSource?.url]); 
 
@@ -109,7 +109,6 @@ export default function AnnotationDisplay({ boxId }: { boxId: string }) {
     if (!pos) return null;
     return { x: pos.x / scale, y: pos.y / scale };
   }, [scale]);
-
 
   const handleStageMouseDown = useCallback(() => {
     if (!canDraw || !activeSource?.url) return;
@@ -126,7 +125,7 @@ export default function AnnotationDisplay({ boxId }: { boxId: string }) {
       if (distance * scale < CLOSING_THRESHOLD) {
         closePolygon(activeSource.url);
         setIsHoveringStartPoint(false);
-        toast.success('Polygon closed. Select crossing lines.');
+        toast.success('多边形闭合. 选择过线.');
         return;
       }
     }
@@ -230,21 +229,21 @@ export default function AnnotationDisplay({ boxId }: { boxId: string }) {
         )}
        
         <Stage
-            ref={stageRef}
-            width={stageDimensions.width}
-            height={stageDimensions.height}
-            scaleX={scale}
-            scaleY={scale}
-            onMouseDown={handleStageMouseDown}
-            style={{
-                cursor: canDraw ? 'crosshair' : (canSelectLines ? 'pointer' : 'default'),
-                position: 'absolute',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)', 
-                zIndex: 10, 
-            }}
-            className="bg-transparent"
+          ref={stageRef}
+          width={stageDimensions.width}
+          height={stageDimensions.height}
+          scaleX={scale}
+          scaleY={scale}
+          onMouseDown={handleStageMouseDown}
+          style={{
+            cursor: canDraw ? 'crosshair' : (canSelectLines ? 'pointer' : 'default'),
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)', 
+            zIndex: 10, 
+          }}
+          className="bg-transparent"
         >
           <Layer>
              {image && activeSource.status !== 'streaming' && activeSource.firstFrameDataUrl && (
@@ -338,7 +337,7 @@ export default function AnnotationDisplay({ boxId }: { boxId: string }) {
       <div className="flex flex-col h-full gap-2">
         <ConfigHeader />
 
-        <div className="flex flex-1 gap-2 overflow-hidden">
+        <div className="flex flex-1 h-full gap-2 overflow-hidden">
           <ConfigSidebar />
 
           <div className="flex-1 h-full bg-white rounded-md shadow-sm overflow-hidden flex flex-col">

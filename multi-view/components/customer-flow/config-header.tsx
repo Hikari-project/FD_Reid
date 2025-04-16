@@ -5,11 +5,14 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useAppStore, selectActiveSourceData } from '@/store/useCustomerAnalysis';
 import { toast } from 'sonner';
+import EditBox from './edit-box';
+import { useBoxStore } from '@/store/useBoxmanagement';
 
 
 export default function ConfigHeader() {
   const [manualRtspInput, setManualRtspInput] = useState<string>('');
   const [selectedFileName, setSelectedFileName] = useState<string>('');
+  const [isEditBoxOpen, setIsEditBoxOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const addRtspSources = useAppStore(state => state.addRtspSources);
@@ -49,6 +52,8 @@ export default function ConfigHeader() {
   const isProcessing = globalStatus === 'loading_file' || globalStatus === 'processing_file';
   const isSourceBusy = !!activeSource && ['loading_frame', 'analyzing', 'streaming'].includes(activeSource.status);
 
+  const currentBox = useBoxStore(state => state);
+
   const handleFileChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) {
@@ -57,7 +62,7 @@ export default function ConfigHeader() {
     }
 
     if (file.type !== 'text/plain') {
-       toast.error("Invalid file type. Please upload a .txt file.");
+       toast.error("文件类型错误. 请上传一个 .txt 文件.");
        if (fileInputRef.current) fileInputRef.current.value = '';
        setSelectedFileName('');
        return;
@@ -102,9 +107,9 @@ export default function ConfigHeader() {
             }
         }),
         {
-            loading: 'Processing file...',
-            success: 'Sources added successfully!',
-            error: (err) => `Error: ${err.message || 'Failed to process file'}`,
+            loading: '处理文件中...',
+            success: 'RTSP源添加成功!',
+            error: (err) => `错误: ${err.message || '处理文件失败'}`,
         }
     );
   }, [addRtspSources, setGlobalStatus]);
@@ -112,12 +117,12 @@ export default function ConfigHeader() {
   const handleManualAdd = useCallback(async () => {
     const url = manualRtspInput.trim();
     if (!url) {
-        toast.error("Please enter an RTSP URL.");
-        return;
+      toast.error("请输入一个 RTSP URL.");
+      return;
     }
-    if (!url.startsWith('rtsp://') && !url.startsWith('http://') && !url.startsWith('https://')) {
-       toast.error("Invalid URL format. Must start with rtsp://, http:// or https://");
-       return;
+    if (!url.startsWith('rtsp://')) {
+      toast.error("URL格式错误. 必须以 rtsp:// 开头");
+      return;
     }
 
     if (url !== 'rtsp://47.97.71.139:8003/video_feed4' 
@@ -133,12 +138,12 @@ export default function ConfigHeader() {
 
     setGlobalStatus('processing_file');
     toast.promise(
-        addRtspSources([url]),
-        {
-            loading: `Adding ${url}...`,
-            success: `Source ${url} added.`,
-            error: `Failed to add source ${url}.`
-        }
+      addRtspSources([url]),
+      {
+        loading: `RTSP 源添加中...`,
+        success: `RTSP 源 ${url} 添加成功.`,
+        error: `RTSP 源 ${url} 添加失败.`
+      }
     )
     //   .finally(() => {
     //     setManualRtspInput(''); 
@@ -154,37 +159,37 @@ export default function ConfigHeader() {
   const handleClearClick = useCallback(() => {
     if (canClear && activeSourceUrl) {
       clearAnnotation(activeSourceUrl);
-      toast.success("Annotation cleared.");
+      toast.success("标注清除.");
     }
   }, [canClear, activeSourceUrl, clearAnnotation]);
 
   const handleStartAnalysisClick = useCallback(() => {
     if (canStartAnalysis && activeSourceUrl) {
-       toast.promise(
-          startAnalysis(activeSourceUrl),
-          {
-             loading: 'Starting analysis...',
-             success: 'Analysis started, waiting for stream...',
-             error: (err) => `Analysis Error: ${err?.message || 'Unknown error'}`,
-          }
-       );
-    } else if (activeSource && !canStartAnalysis) {
-        if (!activeSource.annotation.isClosed) {
-            toast.error("Please close the polygon first.");
-        } else if (activeSource.annotation.selectedLineIndices.length === 0) {
-            toast.error("Please select at least one crossing line.");
-        } else {
-            toast.error("Cannot start analysis in the current state.");
+      toast.promise(
+        startAnalysis(activeSourceUrl),
+        {
+          loading: '开始分析...',
+          success: '分析开始, 等待流...',
+          error: (err) => `分析错误: ${err?.message || '未知错误'}`,
         }
+      );
+    } else if (activeSource && !canStartAnalysis) {
+      if (!activeSource.annotation.isClosed) {
+        toast.error("请先闭合多边形.");
+      } else if (activeSource.annotation.selectedLineIndices.length === 0) {
+        toast.error("请至少选择一条过线.");
+      } else {
+        toast.error("无法在当前状态下开始分析.");
+      }
     }
   }, [canStartAnalysis, activeSourceUrl, startAnalysis, activeSource]);
 
   const handleEnterAnnotationMode = useCallback(() => {
-      if (canManuallyEnterAnnotation && activeSource) {
-          const targetMode = activeSource.annotation.isClosed ? 'line_selection' : 'drawing';
-          setAnnotationMode(targetMode);
-          toast.success(`Entered ${targetMode === 'drawing' ? 'drawing' : 'line selection'} mode.`);
-      }
+    if (canManuallyEnterAnnotation && activeSource) {
+      const targetMode = activeSource.annotation.isClosed ? 'line_selection' : 'drawing';
+      setAnnotationMode(targetMode);
+      toast.success(`Entered ${targetMode === 'drawing' ? 'drawing' : 'line selection'} mode.`);
+    }
   }, [canManuallyEnterAnnotation, activeSource, setAnnotationMode]);
 
 
@@ -211,7 +216,7 @@ export default function ConfigHeader() {
                 {isProcessing ? '处理中...' : '选择一个 .txt 文件'}
               </label>
               <div className={`px-3 py-2 flex-1 text-sm truncate ${selectedFileName ? 'text-gray-800' : 'text-gray-400'}`}>
-                {selectedFileName || 'No file selected'}
+                {selectedFileName || '没有文件选中'}
               </div>
             </div>
           </div>
@@ -236,9 +241,9 @@ export default function ConfigHeader() {
             </div>
           </div>
         </div>
-
+        <div className='flex flex-col gap-2'>
         <div className="flex items-center gap-3 justify-end flex-wrap">
-            <Button
+            {/* <Button
                 onClick={handleEnterAnnotationMode}
                 disabled={!canManuallyEnterAnnotation || isProcessing || isSourceBusy}
                 variant="outline"
@@ -247,7 +252,7 @@ export default function ConfigHeader() {
                 编辑标注
             </Button>
 
-           <div className="border-l h-8 mx-2"></div>
+           <div className="border-l h-8 mx-2"></div> */}
 
           <Button
             onClick={handleUndoClick}
@@ -265,16 +270,31 @@ export default function ConfigHeader() {
           >
             清除标注
           </Button>
-          <Button
-            onClick={handleStartAnalysisClick}
-            disabled={!canStartAnalysis || isProcessing || isSourceBusy}
-            className="bg-green-500 hover:bg-green-600 text-white"
-            title={!canStartAnalysis ? "Annotation incomplete or source busy" : "Start customer flow analysis"}
-          >
-            开始分析
-          </Button>
+            <Button
+              onClick={handleStartAnalysisClick}
+              disabled={!canStartAnalysis || isProcessing || isSourceBusy}
+              className="bg-green-500 hover:bg-green-600 text-white"
+              title={!canStartAnalysis ? "Annotation incomplete or source busy" : "Start customer flow analysis"}
+            >
+              开始分析
+            </Button>
+        </div>
+          <div className='flex justify-end'>
+            <Button 
+              onClick={() => setIsEditBoxOpen(true)} 
+              disabled={isProcessing || isSourceBusy}
+              className='bg-blue-500 hover:bg-blue-600'
+            >
+              编辑盒子
+            </Button>
+          </div>
         </div>
       </div>
+
+      <EditBox
+        isOpen={isEditBoxOpen}
+        onOpenChange={setIsEditBoxOpen}
+      />
     </div>
   );
 }

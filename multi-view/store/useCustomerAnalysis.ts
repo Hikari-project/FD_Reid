@@ -6,44 +6,49 @@ import type {
   AppActions,
   RtspSourceInfo,
   Point,
-  AnnotationMode,
   ZoneType,
 } from '@/store/types'; 
 
-
 async function fetchFirstFrameFromBackend(rtspUrl: string): Promise<{ frameDataUrl: string; width: number; height: number }> {
-  console.log(`STORE: Requesting first frame for ${rtspUrl}`);
-  const response = await fetch('/api/get-frame', { method: 'POST', body: JSON.stringify({ url: rtspUrl }) });
+  const response = await fetch('/api/get-frame', { 
+    method: 'POST', 
+    body: JSON.stringify({ 
+      url: rtspUrl 
+    }) });
   if (!response.ok) throw new Error('Failed to fetch frame');
+
   const data = await response.json();
   return data;
-
 }
 
-// Simulates sending analysis request and getting MJPEG stream URL
 async function startAnalysisOnBackend(
     rtspUrl: string,
     polygonPoints: Point[],
-    crossingLineEndpoints: Point[][], // Array of [startPoint, endPoint] for selected lines
-    zoneType: 'inside' | 'outside' // Renamed from areaType
-    ): Promise<{ mjpegStreamUrl: string }> {
-    console.log(`STORE: Starting analysis for ${rtspUrl}`);
-    console.log("Polygon Points:", polygonPoints);
-    console.log("Crossing Lines Endpoints:", crossingLineEndpoints);
-    console.log("Zone Type:", zoneType); // Log zone type
+    crossingLineEndpoints: Point[][],
+    zoneType: 'inside' | 'outside'
+  ): Promise<{ mjpegStreamUrl: string }> {
+  console.log(`STORE: Starting analysis for ${rtspUrl}`);
+  console.log("Polygon Points:", polygonPoints);
+  console.log("Crossing Lines Endpoints:", crossingLineEndpoints);
+  console.log("Zone Type:", zoneType); 
 
-    // Replace with your actual API call:
-    const payload = {
-      rtsp_address: rtspUrl,
-      polygon_points: polygonPoints,
-      crossing_lines: crossingLineEndpoints,
-      zone_type: zoneType, // Rename key and use zoneType
-    };
-    const response = await fetch('/api/start-analysis', { method: 'POST', body: JSON.stringify(payload), headers: {'Content-Type': 'application/json'} });
-    if (!response.ok) throw new Error('Failed to start analysis');
-    const data = await response.json();
-    return data;
+  const payload = {
+    rtsp_address: rtspUrl,
+    polygon_points: polygonPoints,
+    crossing_lines: crossingLineEndpoints,
+    zone_type: zoneType,
+  };
+  const response = await fetch('/api/start-analysis', { 
+    method: 'POST', 
+    body: JSON.stringify(payload), 
+    headers: {
+      'Content-Type': 'application/json'} 
+    });
 
+  if (!response.ok) throw new Error('Failed to start analysis');
+
+  const data = await response.json();
+  return data;
 }
 
 const initialState: AppState = {
@@ -70,7 +75,12 @@ export const useAppStore = create<AppState & AppActions>()(
           state.rtspSources[url] = {
             url: url,
             firstFrameDataUrl: null,
-            annotation: { points: [], isClosed: false, selectedLineIndices: [], zoneType: null },
+            annotation: { 
+              points: [], 
+              isClosed: false, 
+              selectedLineIndices: [], 
+              zoneType: null 
+            },
             mjpegStreamUrl: null,
             status: 'idle', 
             errorMessage: null,
@@ -78,17 +88,16 @@ export const useAppStore = create<AppState & AppActions>()(
         });
       });
 
-       for (const url of uniqueUrls) {
-           await get()._fetchFirstFrame(url); // Fetch one by one
-       }
-
+      for (const url of uniqueUrls) {
+        await get()._fetchFirstFrame(url);
+      }
 
       set(state => {
-          state.globalStatus = 'idle';
-          if (!state.activeSourceUrl && uniqueUrls.length > 0) {
-              state.activeSourceUrl = uniqueUrls[0];
-              state.annotationMode = state.rtspSources[uniqueUrls[0]].annotation.isClosed ? 'line_selection' : 'drawing';
-          }
+        state.globalStatus = 'idle';
+        if (!state.activeSourceUrl && uniqueUrls.length > 0) {
+          state.activeSourceUrl = uniqueUrls[0];
+          state.annotationMode = state.rtspSources[uniqueUrls[0]].annotation.isClosed ? 'line_selection' : 'drawing';
+        }
       });
     },
 
@@ -112,25 +121,25 @@ export const useAppStore = create<AppState & AppActions>()(
     },
 
     setSourceFrame: (url, frameDataUrl, dimensions, error) => {
-       set(state => {
-           const source = state.rtspSources[url];
-           if (source) {
-               if (error) {
-                   source.status = 'error_frame';
-                   source.errorMessage = error;
-                   source.firstFrameDataUrl = null;
-                   source.imageDimensions = undefined;
-               } else {
-                   source.firstFrameDataUrl = frameDataUrl;
-                   source.status = 'frame_loaded';
-                   source.errorMessage = null;
-                   source.imageDimensions = dimensions;
-                   if (state.activeSourceUrl === url) {
-                       state.annotationMode = source.annotation.isClosed ? 'line_selection' : 'drawing';
-                   }
-               }
-           }
-       });
+      set(state => {
+        const source = state.rtspSources[url];
+        if (source) {
+          if (error) {
+            source.status = 'error_frame';
+            source.errorMessage = error;
+            source.firstFrameDataUrl = null;
+            source.imageDimensions = undefined;
+          } else {
+            source.firstFrameDataUrl = frameDataUrl;
+            source.status = 'frame_loaded';
+            source.errorMessage = null;
+            source.imageDimensions = dimensions;
+            if (state.activeSourceUrl === url) {
+                state.annotationMode = source.annotation.isClosed ? 'line_selection' : 'drawing';
+            }
+          }
+        }
+      });
     },
 
     removeRtspSource: (url) => {
@@ -140,8 +149,8 @@ export const useAppStore = create<AppState & AppActions>()(
           const remainingUrls = Object.keys(state.rtspSources);
           state.activeSourceUrl = remainingUrls.length > 0 ? remainingUrls[0] : null;
           state.annotationMode = state.activeSourceUrl ?
-                (state.rtspSources[state.activeSourceUrl]?.annotation.isClosed ? 'line_selection' : 'drawing')
-                : 'idle';
+            (state.rtspSources[state.activeSourceUrl]?.annotation.isClosed ? 'line_selection' : 'drawing')
+              : 'idle';
         }
       });
     },

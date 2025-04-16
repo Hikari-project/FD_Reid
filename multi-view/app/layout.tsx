@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import AppSidebar from "@/components/app-sidebar";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import { Breadcrumbs } from "@/components/app-header";
 import { Toaster } from "sonner";
+import { CircleAlert, CircleCheck, CircleDashed, CircleX, Info } from "lucide-react";
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -20,36 +18,26 @@ export const metadata: Metadata = {
   description: "方度客流分析系统",
 };
 
-export default function RootLayout({
+const TOAST_ICON = {
+  success: <CircleCheck className="text-green-500 size-4" />,
+  error: <CircleX className="text-red-500 size-4" />,
+  loading: <CircleDashed className="text-yellow-500 size-4" />,
+  info: <Info className="text-blue-500 size-4" />,
+  warning: <CircleAlert className="text-orange-500 size-4" />,
+}
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const customBreadcrumbNames = {
-    annotation: "标注与分析",
-    'customer-flow': "客流分析",
-  };
-
   return (
     <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <Toaster position="top-center" />
-        <SidebarProvider defaultOpen={true}>
-          <AppSidebar />
-          <SidebarInset>
-            <div className="flex flex-col h-full">
-              <Breadcrumbs 
-                pathSegmentNames={customBreadcrumbNames} 
-                containerClassName="h-12 flex items-center px-4 border-b border-gray-200"
-              />
-              <div className="flex-1">
-                {children}
-              </div>
-            </div>
-          </SidebarInset>
-        </SidebarProvider>
+        <Toaster position="top-center" icons={TOAST_ICON} />
+        {children}
       </body>
     </html>
   );
