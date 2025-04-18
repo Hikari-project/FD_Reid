@@ -145,6 +145,7 @@ export default function ConfigHeader() {
         error: `RTSP 源 ${url} 添加失败.`
       }
     )
+    setManualRtspInput(''); 
     //   .finally(() => {
     //     setManualRtspInput(''); 
     // });

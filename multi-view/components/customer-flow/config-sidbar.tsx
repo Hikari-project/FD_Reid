@@ -148,14 +148,14 @@ export default function ConfigSidebar() {
               </div>
 
               {source.firstFrameDataUrl && !source.status.startsWith('error') && (
-                 <div className='mt-1 border border-gray-200 rounded overflow-hidden'>
-                     <img
-                        src={source.firstFrameDataUrl}
-                        alt={`Preview`}
-                        className="w-full h-auto object-contain max-h-32"
-                        loading="lazy"
-                     />
-                 </div>
+                <div className='mt-1 border border-gray-200 rounded overflow-hidden'>
+                  <img
+                    src={source.firstFrameDataUrl}
+                    alt={`Preview`}
+                    className="w-full h-auto object-contain max-h-32"
+                    loading="lazy"
+                  />
+                </div>
               )}
                {source.status === 'error_frame' && (
                    <div className='mt-1 border border-dashed border-red-300 rounded h-20 flex items-center justify-center text-red-500 text-xs p-2'>
