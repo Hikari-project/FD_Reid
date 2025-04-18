@@ -113,7 +113,10 @@ export default function LogManagement() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="box">盒子管理</SelectItem>
-            {/* 添加更多选项 */}
+            <SelectItem value="user">用户管理</SelectItem>
+            <SelectItem value="terminal">镜头配置</SelectItem>
+            <SelectItem value="data">数据推送</SelectItem>
+            <SelectItem value="video">视频流获取</SelectItem>
           </SelectContent>
         </Select>
 
@@ -122,8 +125,11 @@ export default function LogManagement() {
             <SelectValue placeholder="请选择操作名" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="crud">盒子增删改查</SelectItem>
-            {/* 添加更多选项 */}
+            <SelectItem value="boxCrud">盒子增删改查</SelectItem>
+            <SelectItem value="authControl">权限修改</SelectItem>
+            <SelectItem value="terminalCrud">镜头增删改查</SelectItem>
+            <SelectItem value="monitor">监控调度</SelectItem>
+            <SelectItem value="userCrud">用户增删改查</SelectItem>
           </SelectContent>
         </Select>
 
@@ -132,8 +138,9 @@ export default function LogManagement() {
             <SelectValue placeholder="请选择操作类型" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="cancel">取消异常</SelectItem>
-            {/* 添加更多选项 */}
+            <SelectItem value="abnormal">取流异常</SelectItem>
+            <SelectItem value="data">数据推送</SelectItem>
+            <SelectItem value="system">系统操作</SelectItem>
           </SelectContent>
         </Select>
 

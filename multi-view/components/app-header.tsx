@@ -2,6 +2,7 @@
 
 import React, { useMemo } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { HomeIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
 import { CircleUserRound } from 'lucide-react';
@@ -115,6 +116,13 @@ export function Breadcrumbs({
         'flex items-center pr-4 gap-2',
         containerClassName
       )}>
+        <Image 
+          src="/Subtract.png"
+          alt="User icon"
+          width={20}
+          height={20}
+          className="mr-2 mt-0.5"
+        />
         <span>用户：{user?.name}</span>
         <CircleUserRound />
       </div>
