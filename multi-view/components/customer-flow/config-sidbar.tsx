@@ -6,10 +6,8 @@ import type { SourceStatus } from '@/store/types';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import Image from 'next/image';
 import { 
   Dialog, 
-  DialogTrigger, 
   DialogContent, 
   DialogHeader, 
   DialogTitle, 
@@ -94,7 +92,10 @@ export default function ConfigSidebar() {
 
   return (
     <div className="w-72 h-[calc(100dvh-12.5rem)] bg-white rounded-md shadow-sm pt-4 flex flex-col">
-      <h3 className="font-medium text-lg text-gray-700 w-full mb-2 px-4">RTSP 流源</h3>
+      <div className='flex justify-between items-center'>
+        <h3 className="font-medium text-lg text-gray-700 w-full mb-2 px-4">RTSP 流源</h3>
+        
+      </div>
 
       {sources.length === 0 ? (
         <div className="text-gray-500 text-sm py-6 text-center flex-1 px-4">

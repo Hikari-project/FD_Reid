@@ -23,28 +23,33 @@ export async function POST(request: Request) {
         frameDataUrl: '/images/test1.png', // Fixed image path
         width: 1920,
         height: 1080,
+        rawMjpegStreamUrl: 'http://47.97.71.139:8003/video_feed1',
       };
     } else if (rtspUrl === 'rtsp://47.97.71.139:8003/video_feed2') {
       responseData = {
         frameDataUrl: '/images/test2.png', // Fixed image path
         width: 1920,
         height: 1080,
+        rawMjpegStreamUrl: 'http://47.97.71.139:8003/video_feed2',
       };
     } else if (rtspUrl === 'rtsp://47.97.71.139:8003/video_feed3') {
       responseData = {
         frameDataUrl: '/images/test3.png', // Fixed image path
         width: 1920,
         height: 1080,
+        rawMjpegStreamUrl: 'http://47.97.71.139:8003/video_feed3',
       };
     } else if (rtspUrl === 'rtsp://47.97.71.139:8003/video_feed4') {
       responseData = {
         frameDataUrl: '/images/test4.png', // Fixed image path
         width: 1920,
         height: 1080,
+        rawMjpegStreamUrl: 'http://47.97.71.139:8003/video_feed4',
       };
     } else {
       responseData = {
         frameDataUrl: 'error', // Fixed image path
+        rawMjpegStreamUrl: 'error',
       };
     }
 

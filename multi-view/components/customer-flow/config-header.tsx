@@ -71,46 +71,48 @@ export default function ConfigHeader() {
     setSelectedFileName(file.name);
     setGlobalStatus('loading_file');
     toast.promise(
-        new Promise<void>(async (resolve, reject) => {
-            try {
-                const reader = new FileReader();
-                reader.onload = async (e) => {
-                const text = e.target?.result as string;
-                if (text) {
-                    const urls = text
-                    .split('\n')
-                    .map(line => line.trim())
-                    .filter(line => line.length > 0 && (line.startsWith('rtsp://') || line.startsWith('http://') || line.startsWith('https://'))); // Basic validation
+      new Promise<void>(async (resolve, reject) => {
+        try {
+          const reader = new FileReader();
+          reader.onload = async (e) => {
+          const text = e.target?.result as string;
+          if (text) {
+            const urls = text
+            .split('\n')
+            .map(line => line.trim())
+            .filter(line => line.length > 0 && (line.startsWith('rtsp://') || line.startsWith('http://') || line.startsWith('https://'))); // Basic validation
 
-                    if (urls.length === 0) {
-                        throw new Error("No valid RTSP URLs found in the file.");
-                    }
-
-                    setGlobalStatus('processing_file');
-                    await addRtspSources(urls);
-                    resolve();
-                } else {
-                    throw new Error("File is empty or could not be read.");
-                }
-                };
-                reader.onerror = () => {
-                    throw new Error("Error reading file.");
-                };
-                reader.readAsText(file);
-            } catch (error: any) {
-                 console.error("File processing error:", error);
-                 setGlobalStatus('error', error.message || 'Failed to process file');
-                 setSelectedFileName('');
-                 reject(error);
-            } finally {
-                 if (fileInputRef.current) fileInputRef.current.value = '';
+            if (urls.length === 0) {
+                throw new Error("No valid RTSP URLs found in the file.");
             }
-        }),
-        {
-            loading: '处理文件中...',
-            success: 'RTSP源添加成功!',
-            error: (err) => `错误: ${err.message || '处理文件失败'}`,
+
+            setGlobalStatus('processing_file');
+            await addRtspSources(urls);
+            setGlobalStatus('idle');
+            resolve();
+          } else {
+            throw new Error("File is empty or could not be read.");
+          }
+          };
+          reader.onerror = () => {
+            throw new Error("Error reading file.");
+          };
+          reader.readAsText(file);
+        } catch (error: any) {
+          console.error("File processing error:", error);
+          setGlobalStatus('error', error.message || 'Failed to process file');
+          setSelectedFileName('');
+          reject(error);
+        } finally {
+          if (fileInputRef.current) fileInputRef.current.value = '';
+          setGlobalStatus('idle');
         }
+      }),
+      {
+        loading: '处理文件中...',
+        success: 'RTSP源添加成功!',
+        error: (err) => `错误: ${err.message || '处理文件失败'}`,
+      }
     );
   }, [addRtspSources, setGlobalStatus]);
 
@@ -145,10 +147,8 @@ export default function ConfigHeader() {
         error: `RTSP 源 ${url} 添加失败.`
       }
     )
-    setManualRtspInput(''); 
-    //   .finally(() => {
-    //     setManualRtspInput(''); 
-    // });
+    setManualRtspInput('');
+    
   }, [manualRtspInput, addRtspSources, setGlobalStatus]);
 
   const handleUndoClick = useCallback(() => {

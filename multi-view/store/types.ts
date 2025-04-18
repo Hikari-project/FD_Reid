@@ -10,56 +10,58 @@ export interface Annotation {
   // Stores indices of the *starting point* of selected lines.
   // e.g., [0, 3] means line 0-1 and line 3-4 are selected.
   selectedLineIndices: number[];
-  zoneType?: 'inside' | 'outside' | null; // Renamed from areaType
+  zoneType?: 'inside' | 'outside' | null;
 }
 
-export type ZoneType = 'inside' | 'outside' | null; // Add ZoneType definition
+export type ZoneType = 'inside' | 'outside' | null; 
 
 export type SourceStatus =
-  | 'idle' // Initial state
-  | 'loading_frame' // Fetching first frame
-  | 'frame_loaded' // Frame ready for annotation
-  | 'annotating' // Polygon drawing or line selection active
-  | 'annotated' // Annotation complete, ready for analysis
-  | 'analyzing' // Analysis request sent, waiting for MJPEG
-  | 'streaming' // MJPEG stream received and playing
-  | 'error_frame' // Error fetching first frame
-  | 'error_analysis' // Error during analysis/MJPEG retrieval
-  | 'error_rtsp' // General error related to this source
+  | 'idle' 
+  | 'loading_frame' 
+  | 'frame_loaded' 
+  | 'annotating' 
+  | 'annotated' 
+  | 'analyzing' 
+  | 'streaming' 
+  | 'error_frame' 
+  | 'error_analysis' 
+  | 'error_rtsp' 
 
 export interface RtspSourceInfo {
   url: string;
-  firstFrameDataUrl: string | null; // Base64 data URL for the image
+  name?: string;
+  firstFrameDataUrl: string | null;
   annotation: Annotation;
-  mjpegStreamUrl: string | null;
+  mjpegStreamUrl: string | null; // Processed stream
+  rawMjpegStreamUrl?: string | null; // Raw/original stream
   status: SourceStatus;
-  errorMessage?: string | null; // Optional error message for this source
-  imageDimensions?: { width: number; height: number }; // Store original image dimensions
+  errorMessage?: string | null;
+  imageDimensions?: { width: number; height: number };
 }
 
 export type AnnotationMode = 'drawing' | 'line_selection' | 'idle';
 
 export interface AppState {
-  rtspSources: Record<string, RtspSourceInfo>; // Map URL to its info
-  activeSourceUrl: string | null; // URL of the source currently being annotated/viewed
+  rtspSources: Record<string, RtspSourceInfo>;
+  activeSourceUrl: string | null;
   annotationMode: AnnotationMode;
   globalStatus: 'idle' | 'loading_file' | 'processing_file' | 'error';
   globalErrorMessage?: string | null;
 }
 
 export interface AppActions {
-  // --- Source Management ---
-  addRtspSources: (urls: string[]) => Promise<void>; // Handles multiple URLs (from file or manual bulk)
-  _fetchFirstFrame: (url: string) => Promise<void>; // Internal action to fetch frame
+  addRtspSources: (urls: string[]) => Promise<void>;
+  _fetchFirstFrame: (url: string) => Promise<void>;
   setSourceFrame: (
     url: string,
     frameDataUrl: string | null,
     dimensions?: { width: number; height: number },
-    error?: string
+    error?: string,
+    rawMjpegStreamUrl?: string | null
   ) => void;
   removeRtspSource: (url: string) => void;
   setActiveSource: (url: string | null) => void;
-  resetSourceStatus: (url: string) => void; // Resets status, MJPEG, keeps frame/annotation
+  resetSourceStatus: (url: string) => void;
 
   // --- Annotation ---
   setAnnotationMode: (mode: AnnotationMode) => void;
@@ -67,8 +69,8 @@ export interface AppActions {
   undoLastPoint: (url: string) => void;
   clearAnnotation: (url: string) => void;
   closePolygon: (url: string) => void;
-  toggleLineSelection: (url: string, lineIndex: number) => void; // Index of the starting point of the line
-  setZoneType: (url: string, type: 'inside' | 'outside') => void; // Renamed from setAreaType
+  toggleLineSelection: (url: string, lineIndex: number) => void;
+  setZoneType: (url: string, type: 'inside' | 'outside') => void;
 
   // --- Analysis ---
   startAnalysis: (url: string) => Promise<void>;

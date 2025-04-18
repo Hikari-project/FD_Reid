@@ -50,11 +50,25 @@ export default function AnnotationDisplay() {
   const points = useMemo(() => activeSource?.annotation?.points ?? [], [activeSource?.annotation?.points]);
 
   const isClosed = activeSource?.annotation?.isClosed ?? false;
-  const selectedLineIndices = useMemo(() => activeSource?.annotation?.selectedLineIndices ?? [], [activeSource?.annotation?.selectedLineIndices]);
-  const annotation = useMemo(() => activeSource?.annotation, [activeSource?.annotation]) as Annotation | undefined;
+  const selectedLineIndices = useMemo(() => 
+    activeSource?.annotation?.selectedLineIndices 
+    ?? [], 
+  [activeSource?.annotation?.selectedLineIndices]);
 
-  const canDraw = annotationMode === 'drawing' && !!activeSource && !isClosed && !activeSource.status.startsWith('error') && activeSource.status !== 'streaming' && activeSource.status !== 'analyzing';
-  const canSelectLines = annotationMode === 'line_selection' && !!activeSource && isClosed && !activeSource.status.startsWith('error') && activeSource.status !== 'streaming' && activeSource.status !== 'analyzing';
+  const canDraw = 
+    annotationMode === 'drawing' 
+    && !!activeSource 
+    && !isClosed 
+    && !activeSource.status.startsWith('error') 
+    && activeSource.status !== 'streaming' 
+    && activeSource.status !== 'analyzing';
+  const canSelectLines = 
+    annotationMode === 'line_selection' 
+    && !!activeSource 
+    && isClosed 
+    && !activeSource.status.startsWith('error') 
+    && activeSource.status !== 'streaming' 
+    && activeSource.status !== 'analyzing';
 
   useEffect(() => {
     const calculateSize = () => {
@@ -132,12 +146,22 @@ export default function AnnotationDisplay() {
 
     addAnnotationPoint(activeSource.url, pos);
 
-  }, [canDraw, points, isClosed, scale, activeSource?.url, getScaledPointerPosition, addAnnotationPoint, closePolygon]);
+  }, [
+    canDraw, 
+    points, 
+    isClosed,
+    scale, 
+    activeSource?.url, 
+    getScaledPointerPosition, 
+    addAnnotationPoint, 
+    closePolygon
+  ]);
 
 
   const handleLineClick = useCallback((lineIndex: number) => {
-     if (!canSelectLines || !activeSource?.url) return;
-     toggleLineSelection(activeSource.url, lineIndex);
+    if (!canSelectLines || !activeSource?.url) return;
+    toggleLineSelection(activeSource.url, lineIndex);
+    toast.success('选择过线.');
   }, [canSelectLines, activeSource?.url, toggleLineSelection]);
 
 
@@ -151,11 +175,11 @@ export default function AnnotationDisplay() {
       setIsHoveringStartPoint(false);
   }, []);
 
-   const handleLineHover = useCallback((lineIndex: number | null) => {
-       if (canSelectLines) {
-           setHoveredLineIndex(lineIndex);
-       }
-   }, [canSelectLines]);
+  const handleLineHover = useCallback((lineIndex: number | null) => {
+    if (canSelectLines) {
+      setHoveredLineIndex(lineIndex);
+    }
+  }, [canSelectLines]);
 
    const handleZoneTypeChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
        if (!activeSource?.url || !canSelectLines) return;
@@ -164,7 +188,13 @@ export default function AnnotationDisplay() {
        toast.info(`区域类型设置为: ${selectedType === 'inside' ? '店内' : '店外'}`);
    }, [activeSource?.url, canSelectLines, setZoneType]);
 
-   const polygonFillColor = useMemo(() => zoneType === 'inside' ? 'rgba(0, 255, 0, 0.3)' : zoneType === 'outside' ? 'rgba(255, 255, 0, 0.3)' : 'transparent', [zoneType]);
+  const polygonFillColor = useMemo(() => 
+  zoneType === 'inside' 
+  ? 'rgba(0, 255, 0, 0.3)'
+  : zoneType === 'outside' 
+    ? 'rgba(255, 255, 0, 0.3)' 
+    : 'transparent', 
+  [zoneType]);
 
   const content = useMemo(() => {
     if (!activeSource) {
@@ -172,17 +202,17 @@ export default function AnnotationDisplay() {
     }
 
     if (activeSource.status === 'loading_frame') {
-        return <div className="text-gray-500 text-center p-10 animate-pulse">加载第一帧...</div>;
+      return <div className="text-gray-500 text-center p-10 animate-pulse">加载第一帧...</div>;
     }
 
-     if (activeSource.status.startsWith('error')) {
-        return (
-            <div className="text-red-600 text-center p-10 flex flex-col items-center justify-center">
-                <p className="font-semibold text-lg mb-2">错误</p>
-                <p>{activeSource.errorMessage || '发生了一个未知错误。'}</p>
-            </div>
-        );
-     }
+    if (activeSource.status.startsWith('error')) {
+      return (
+        <div className="text-red-600 text-center p-10 flex flex-col items-center justify-center">
+          <p className="font-semibold text-lg mb-2">错误</p>
+          <p>{activeSource.errorMessage || '发生了一个未知错误。'}</p>
+        </div>
+      );
+    }
 
     return (
       <div className="relative w-full h-full bg-gray-900">
@@ -214,18 +244,18 @@ export default function AnnotationDisplay() {
           </div>
         )}
         {activeSource.status === 'streaming' && activeSource.mjpegStreamUrl && activeSource.mjpegStreamUrl !== 'error' && (
-            <img
-                src={activeSource.mjpegStreamUrl}
-                // src={"http://localhost:8003/video_feed"}
-                alt="MJPEG 流"
-                className="absolute top-0 left-0 w-full h-full object-contain z-0" 
-            />
+          <img
+            src={activeSource.mjpegStreamUrl}
+            // src={"http://localhost:8003/video_feed"}
+            alt="MJPEG 流"
+            className="absolute top-0 left-0 w-full h-full object-contain z-0" 
+          />
         )}
         {activeSource.status === 'streaming' && activeSource.mjpegStreamUrl && activeSource.mjpegStreamUrl === 'error' && (
-            <div className="text-red-600 text-center p-10 flex flex-col items-center justify-center">
-                <p className="font-semibold text-lg mb-2">错误</p>
-                <p>无法连接到 RTSP 流。请检查流地址是否正确。</p>
-            </div>
+          <div className="text-red-600 text-center p-10 flex flex-col items-center justify-center">
+            <p className="font-semibold text-lg mb-2">错误</p>
+            <p>无法连接到 RTSP 流。请检查流地址是否正确。</p>
+          </div>
         )}
        
         <Stage
@@ -256,54 +286,54 @@ export default function AnnotationDisplay() {
              )}
 
             {points.length > 0 && (
-                <Line
-                    points={points.flatMap((p: Point) => [p.x, p.y])}
-                    stroke={LINE_COLOR}
-                    strokeWidth={(isClosed ? LINE_STROKE_WIDTH : LINE_STROKE_WIDTH) / scale}
-                    closed={isClosed}
-                    lineCap="round"
-                    lineJoin="round"
-                    listening={false}
-                    fill={isClosed ? polygonFillColor : 'transparent'}
-                />
+              <Line
+                points={points.flatMap((p: Point) => [p.x, p.y])}
+                stroke={LINE_COLOR}
+                strokeWidth={(isClosed ? LINE_STROKE_WIDTH : LINE_STROKE_WIDTH) / scale}
+                closed={isClosed}
+                lineCap="round"
+                lineJoin="round"
+                listening={false}
+                fill={isClosed ? polygonFillColor : 'transparent'}
+              />
             )}
 
             {isClosed && points.length >= 2 && points.map((startPoint: Point, index: number) => {
-                const nextIndex = (index + 1) % points.length;
-                const endPoint = points[nextIndex];
-                const isSelected = selectedLineIndices.includes(index);
-                const isHovered = hoveredLineIndex === index;
+              const nextIndex = (index + 1) % points.length;
+              const endPoint = points[nextIndex];
+              const isSelected = selectedLineIndices.includes(index);
+              const isHovered = hoveredLineIndex === index;
 
-                return (
-                    <Line
-                        key={`select-line-${activeSource.url}-${index}`}
-                        points={[startPoint.x, startPoint.y, endPoint.x, endPoint.y]}
-                        stroke={isSelected ? SELECTED_LINE_COLOR : (isHovered ? HOVER_LINE_COLOR : 'transparent')}
-                        strokeWidth={(isSelected ? SELECTED_LINE_STROKE_WIDTH : HIT_STROKE_WIDTH) / scale }
-                        hitStrokeWidth={HIT_STROKE_WIDTH / scale} 
-                        listening={canSelectLines}
-                        onClick={() => handleLineClick(index)}
-                        onTap={() => handleLineClick(index)} 
-                        onMouseEnter={() => handleLineHover(index)}
-                        onMouseLeave={() => handleLineHover(null)}
-                    />
-                );
+              return (
+                <Line
+                  key={`select-line-${activeSource.url}-${index}`}
+                  points={[startPoint.x, startPoint.y, endPoint.x, endPoint.y]}
+                  stroke={isSelected ? SELECTED_LINE_COLOR : (isHovered ? HOVER_LINE_COLOR : 'transparent')}
+                  strokeWidth={(isSelected ? SELECTED_LINE_STROKE_WIDTH : HIT_STROKE_WIDTH) / scale }
+                  hitStrokeWidth={HIT_STROKE_WIDTH / scale} 
+                  listening={canSelectLines}
+                  onClick={() => handleLineClick(index)}
+                  onTap={() => handleLineClick(index)} 
+                  onMouseEnter={() => handleLineHover(index)}
+                  onMouseLeave={() => handleLineHover(null)}
+                />
+              );
             })}
 
             {points.map((point: Point, index: number) => (
-                <Circle
-                    key={`dot-${activeSource.url}-${index}`}
-                    x={point.x}
-                    y={point.y}
-                    radius={DOT_RADIUS / scale} 
-                    fill={(index === 0 && isHoveringStartPoint && canDraw) ? DOT_HOVER_FILL_COLOR : DOT_FILL_COLOR}
-                    shadowBlur={(index === 0 && isHoveringStartPoint && canDraw) ? (5 / scale) : 0} 
-                    stroke="black"
-                    strokeWidth={1 / scale}
-                    listening={index === 0 && canDraw && points.length >=3}
-                    onMouseEnter={handleStartDotMouseEnter}
-                    onMouseLeave={handleStartDotMouseLeave}
-                />
+              <Circle
+                key={`dot-${activeSource.url}-${index}`}
+                x={point.x}
+                y={point.y}
+                radius={DOT_RADIUS / scale} 
+                fill={(index === 0 && isHoveringStartPoint && canDraw) ? DOT_HOVER_FILL_COLOR : DOT_FILL_COLOR}
+                shadowBlur={(index === 0 && isHoveringStartPoint && canDraw) ? (5 / scale) : 0} 
+                stroke="black"
+                strokeWidth={1 / scale}
+                listening={index === 0 && canDraw && points.length >=3}
+                onMouseEnter={handleStartDotMouseEnter}
+                onMouseLeave={handleStartDotMouseLeave}
+              />
             ))}
 
           </Layer>

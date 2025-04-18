@@ -11,7 +11,7 @@ import type {
 
 async function fetchFirstFrameFromBackend(
   rtspUrl: string
-): Promise<{ frameDataUrl: string; width: number; height: number }> {
+): Promise<{ frameDataUrl: string; width: number; height: number; rawMjpegStreamUrl?: string }> {
   const response = await fetch('/api/get-frame', { 
     method: 'POST', 
     body: JSON.stringify({ 
@@ -74,6 +74,7 @@ export const useAppStore = create<AppState & AppActions>()(
             state.rtspSources[url] = {
               url: url,
               firstFrameDataUrl: null,
+              rawMjpegStreamUrl: null,
               annotation: { 
                 points: [], 
                 isClosed: false, 
@@ -111,15 +112,15 @@ export const useAppStore = create<AppState & AppActions>()(
         });
 
         try {
-          const { frameDataUrl, width, height } = await fetchFirstFrameFromBackend(url);
-          get().setSourceFrame(url, frameDataUrl, {width, height});
+          const { frameDataUrl, width, height, rawMjpegStreamUrl } = await fetchFirstFrameFromBackend(url);
+          get().setSourceFrame(url, frameDataUrl, {width, height}, undefined, rawMjpegStreamUrl);
         } catch (error: any) {
           console.error(`Error fetching frame for ${url}:`, error);
           get().setSourceFrame(url, null, undefined, error.message || 'Failed to fetch first frame');
         }
       },
 
-      setSourceFrame: (url, frameDataUrl, dimensions, error) => {
+      setSourceFrame: (url, frameDataUrl, dimensions, error, rawMjpegStreamUrl) => {
         set(state => {
           const source = state.rtspSources[url];
           if (source) {
@@ -127,9 +128,11 @@ export const useAppStore = create<AppState & AppActions>()(
               source.status = 'error_frame';
               source.errorMessage = error;
               source.firstFrameDataUrl = null;
+              source.rawMjpegStreamUrl = null;
               source.imageDimensions = undefined;
             } else {
               source.firstFrameDataUrl = frameDataUrl;
+              source.rawMjpegStreamUrl = rawMjpegStreamUrl ?? null;
               source.status = 'frame_loaded';
               source.errorMessage = null;
               source.imageDimensions = dimensions;
@@ -176,6 +179,7 @@ export const useAppStore = create<AppState & AppActions>()(
               if(source) {
                   source.status = source.firstFrameDataUrl ? 'frame_loaded' : 'idle';
                   source.mjpegStreamUrl = null;
+                  source.rawMjpegStreamUrl = null;
                   source.errorMessage = null;
                   if (state.activeSourceUrl === url) {
                       state.annotationMode = source.annotation.isClosed ? 'line_selection' : 'drawing';
@@ -225,6 +229,7 @@ export const useAppStore = create<AppState & AppActions>()(
                 source.status = source.firstFrameDataUrl ? 'frame_loaded' : 'idle';
             }
             source.mjpegStreamUrl = null;
+            source.rawMjpegStreamUrl = null;
             if(state.activeSourceUrl === url) {
                 state.annotationMode = 'drawing';
             }
@@ -371,7 +376,12 @@ export const useAppStore = create<AppState & AppActions>()(
       name: 'customer-analysis-store',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        rtspSources: state.rtspSources,
+        rtspSources: Object.fromEntries(
+          Object.entries(state.rtspSources).map(([key, value]) => [
+            key,
+            { ...value, rawMjpegStreamUrl: value.rawMjpegStreamUrl ?? null },
+          ])
+        ),
         activeSourceUrl: state.activeSourceUrl,
         annotationMode: state.annotationMode,
         globalStatus: state.globalStatus,
