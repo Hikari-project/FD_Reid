@@ -75,37 +75,43 @@ export default function ConfigHeader() {
         try {
           const reader = new FileReader();
           reader.onload = async (e) => {
-          const text = e.target?.result as string;
-          if (text) {
-            const urls = text
-            .split('\n')
-            .map(line => line.trim())
-            .filter(line => line.length > 0 && (line.startsWith('rtsp://') || line.startsWith('http://') || line.startsWith('https://'))); // Basic validation
+            try {
+              const text = e.target?.result as string;
+              if (text) {
+                const urls = text
+                  .split('\n')
+                  .map(line => line.trim())
+                  .filter(line => line.length > 0 && (line.startsWith('rtsp://') || line.startsWith('http://') || line.startsWith('https://'))); // Basic validation
 
-            if (urls.length === 0) {
-                throw new Error("No valid RTSP URLs found in the file.");
+                if (urls.length === 0) {
+                  throw new Error("No valid RTSP URLs found in the file."); 
+                }
+
+                setGlobalStatus('processing_file');
+                await addRtspSources(urls);
+                setGlobalStatus('idle'); 
+                resolve();
+              } else {
+                throw new Error("File is empty or could not be read."); 
+              }
+            } catch (innerError: any) { 
+               console.error("File processing error (inner):", innerError);
+               setGlobalStatus('error', innerError.message || 'Failed to process file');
+               setSelectedFileName('');
+               reject(innerError); 
             }
-
-            setGlobalStatus('processing_file');
-            await addRtspSources(urls);
-            setGlobalStatus('idle');
-            resolve();
-          } else {
-            throw new Error("File is empty or could not be read.");
-          }
           };
           reader.onerror = () => {
             throw new Error("Error reading file.");
           };
           reader.readAsText(file);
-        } catch (error: any) {
-          console.error("File processing error:", error);
+        } catch (error: any) { 
+          console.error("File processing error (outer):", error);
           setGlobalStatus('error', error.message || 'Failed to process file');
           setSelectedFileName('');
           reject(error);
         } finally {
           if (fileInputRef.current) fileInputRef.current.value = '';
-          setGlobalStatus('idle');
         }
       }),
       {
@@ -115,6 +121,7 @@ export default function ConfigHeader() {
       }
     );
   }, [addRtspSources, setGlobalStatus]);
+
 
   const handleManualAdd = useCallback(async () => {
     const url = manualRtspInput.trim();

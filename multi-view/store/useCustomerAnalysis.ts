@@ -100,7 +100,10 @@ export const useAppStore = create<AppState & AppActions>()(
 
       addRtspSources: async (urls) => {
         const uniqueUrls = urls.filter(url => url.trim() && !get().rtspSources[url]);
-        if (uniqueUrls.length === 0) return;
+        if (uniqueUrls.length === 0) {
+          get().setGlobalStatus('idle', 'No valid RTSP URLs found in the file.');
+          return;
+        }
 
         set(state => {
           state.globalStatus = 'processing_file';
