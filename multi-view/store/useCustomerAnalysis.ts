@@ -9,7 +9,7 @@ import type {
   ZoneType,
 } from '@/store/types';
 
-
+const backendUrl = "http://127.0.0.1:7111";
 
 async function fetchFirstFrameFromBackend(
   rtspUrl: string
@@ -22,7 +22,7 @@ async function fetchFirstFrameFromBackend(
       width: number;
     }
   }> {
-  const response = await fetch('http://127.0.0.1:7111/customer-flow/check-rtsp', { 
+  const response = await fetch(`${backendUrl}/customer-flow/check-rtsp`, { 
     method: 'POST', 
     headers: {
       'Content-Type': 'application/json'
@@ -69,7 +69,7 @@ async function startAnalysisOnBackend(
     ]
   }
 
-  const response = await fetch('http://127.0.0.1:7111/customer-flow/custome-analysis', { 
+  const response = await fetch(`${backendUrl}/customer-flow/custome-analysis`, { 
     method: 'POST', 
     body: JSON.stringify(payload), 
     headers: {
@@ -151,10 +151,10 @@ export const useAppStore = create<AppState & AppActions>()(
           if (status === 'success') {
             get().setSourceFrame(
               url, 
-              `http://127.0.0.1:7111${frame_url}`, 
+              `${backendUrl}${frame_url}`, 
               {width: size.width, height: size.height}, 
               undefined, 
-              `http://127.0.0.1:7111${mjpeg_stream}`
+              `${backendUrl}${mjpeg_stream}`
             );
           } else {
             get().setSourceFrame(url, null, undefined, 'Failed to fetch first frame');
@@ -368,7 +368,7 @@ export const useAppStore = create<AppState & AppActions>()(
 
           const mjpegUrl = analysisResponse.res[0].mjpeg_url;
 
-          get().setMjpegStream(url, `http://127.0.0.1:7111${mjpegUrl}`);
+          get().setMjpegStream(url, `${backendUrl}${mjpegUrl}`);
         } catch (error: any) {
           console.error(`Error starting analysis for ${url}:`, error);
           get().setMjpegStream(url, null, error.message || 'Failed to start analysis');
