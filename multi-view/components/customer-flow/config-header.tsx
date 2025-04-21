@@ -127,16 +127,16 @@ export default function ConfigHeader() {
       return;
     }
 
-    if (url !== 'rtsp://47.97.71.139:8003/video_feed4' 
-      && url !== 'rtsp://47.97.71.139:8003/video_feed3'
-      && url !== 'rtsp://47.97.71.139:8003/video_feed2'
-      && url !== 'rtsp://47.97.71.139:8003/video_feed1'
-    ) {
-      setTimeout(() => {
-        toast.error("连接失败，请检查 URL 是否正确。");
-      }, 2000);
-      return;
-    }
+    // if (url !== 'rtsp://47.97.71.139:8003/video_feed4' 
+    //   && url !== 'rtsp://47.97.71.139:8003/video_feed3'
+    //   && url !== 'rtsp://47.97.71.139:8003/video_feed2'
+    //   && url !== 'rtsp://47.97.71.139:8003/video_feed1'
+    // ) {
+    //   setTimeout(() => {
+    //     toast.error("连接失败，请检查 URL 是否正确。");
+    //   }, 2000);
+    //   return;
+    // }
 
     setGlobalStatus('processing_file');
     toast.promise(

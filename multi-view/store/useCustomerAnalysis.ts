@@ -7,19 +7,34 @@ import type {
   RtspSourceInfo,
   Point,
   ZoneType,
-} from '@/store/types'; 
+} from '@/store/types';
+
+
 
 async function fetchFirstFrameFromBackend(
   rtspUrl: string
-): Promise<{ frameDataUrl: string; width: number; height: number; rawMjpegStreamUrl?: string }> {
-  const response = await fetch('/api/get-frame', { 
+): Promise<{ 
+    status: string; 
+    frame_url: string; 
+    mjpeg_stream: string;
+    size: {
+      height: number;
+      width: number;
+    }
+  }> {
+  const response = await fetch('http://47.97.71.139:8000/customer-flow/check-rtsp', { 
     method: 'POST', 
+    headers: {
+      'Content-Type': 'application/json'
+    },
     body: JSON.stringify({ 
-      url: rtspUrl 
+      rtsp_url: rtspUrl
     }) });
+
   if (!response.ok) throw new Error('Failed to fetch frame');
 
   const data = await response.json();
+  console.log("fetchFirstFrameFromBackend response", data);
   return data;
 }
 
@@ -28,24 +43,44 @@ async function startAnalysisOnBackend(
     polygonPoints: Point[],
     crossingLineEndpoints: Point[][],
     zoneType: 'inside' | 'outside'
-  ): Promise<{ mjpegStreamUrl: string }> {
-  const payload = {
-    rtsp_address: rtspUrl,
-    polygon_points: polygonPoints,
-    crossing_lines: crossingLineEndpoints,
-    zone_type: zoneType,
-  };
+  ): Promise<{ 
+    ret: number,
+    message: string,
+    res: Array<{
+      source_url: string,
+      mjpeg_url: string,
+      is_rtsp: boolean,
+      stream_index: number,
+    }>
+  }> {
+  const transformedPoints = polygonPoints.map(p => [Math.floor(p.x), Math.floor(p.y)]);
+  const transformedCrossingLineEndpoints = crossingLineEndpoints.map(line => 
+    line.map(p => [Math.floor(p.x), Math.floor(p.y)])
+  );
 
-  const response = await fetch('/api/start-analysis', { 
+  const payload = {
+    videos: [
+      {
+        rtsp_url: rtspUrl,
+        points: transformedPoints,
+        passway: transformedCrossingLineEndpoints,
+        area_type: zoneType,
+      }
+    ]
+  }
+
+  const response = await fetch('http://47.97.71.139:8000/customer-flow/custome-analysis', { 
     method: 'POST', 
     body: JSON.stringify(payload), 
     headers: {
-      'Content-Type': 'application/json'} 
-    });
+      'Content-Type': 'application/json'
+    } 
+  });
 
   if (!response.ok) throw new Error('Failed to start analysis');
 
   const data = await response.json();
+  console.log("analysis response", data);
   return data;
 }
 
@@ -112,8 +147,18 @@ export const useAppStore = create<AppState & AppActions>()(
         });
 
         try {
-          const { frameDataUrl, width, height, rawMjpegStreamUrl } = await fetchFirstFrameFromBackend(url);
-          get().setSourceFrame(url, frameDataUrl, {width, height}, undefined, rawMjpegStreamUrl);
+          const { status, frame_url, mjpeg_stream, size } = await fetchFirstFrameFromBackend(url);
+          if (status === 'success') {
+            get().setSourceFrame(
+              url, 
+              `http://47.97.71.139:8000${frame_url}`, 
+              {width: size.width, height: size.height}, 
+              undefined, 
+              `http://47.97.71.139:8000${mjpeg_stream}`
+            );
+          } else {
+            get().setSourceFrame(url, null, undefined, 'Failed to fetch first frame');
+          }
         } catch (error: any) {
           console.error(`Error fetching frame for ${url}:`, error);
           get().setSourceFrame(url, null, undefined, error.message || 'Failed to fetch first frame');
@@ -310,13 +355,20 @@ export const useAppStore = create<AppState & AppActions>()(
             return [points[startIndex], points[endIndex]];
           });
 
-          const { mjpegStreamUrl } = await startAnalysisOnBackend(
+          const analysisResponse = await startAnalysisOnBackend(
             url,
             source.annotation.points,
             crossingLineEndpoints,
             zoneType
           );
-          get().setMjpegStream(url, mjpegStreamUrl);
+
+          if (analysisResponse.ret !== 0 || !analysisResponse.res || analysisResponse.res.length === 0) {
+            throw new Error(analysisResponse.message || 'Analysis failed on backend.');
+          }
+
+          const mjpegUrl = analysisResponse.res[0].mjpeg_url;
+
+          get().setMjpegStream(url, `http://47.97.71.139:8000${mjpegUrl}`);
         } catch (error: any) {
           console.error(`Error starting analysis for ${url}:`, error);
           get().setMjpegStream(url, null, error.message || 'Failed to start analysis');

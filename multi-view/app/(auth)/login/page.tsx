@@ -9,10 +9,11 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { LockKeyhole, Smartphone } from 'lucide-react'
+import { Eye, EyeOff, LockKeyhole, Smartphone } from 'lucide-react'
 
 export default function Page() {
   const [loginState, setLoginState] = useState<loginState>({ status: "idle" });
+  const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
 
   const form = useForm({
@@ -97,10 +98,25 @@ export default function Page() {
                         {...field} 
                         placeholder="请输入登录密码" 
                         className="h-12 pl-8"
-                        type="password"
+                        type={showPassword ? "text" : "password"}
                       />
                     </FormControl>
                     <LockKeyhole className='size-5 absolute left-2 top-1/2 -translate-y-1/2 text-gray-400' />
+                    <Button 
+                      type="button"
+                      variant="ghost"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
+                    >
+                      {showPassword ? (
+                        <Eye className="size-5 text-gray-400" />
+                      ) : (
+                        <EyeOff className="size-5 text-gray-400" />
+                      )}
+                      <span className="sr-only">
+                        {showPassword ? "隐藏密码" : "显示密码"}
+                      </span>
+                    </Button>
                   </FormItem>
                 )}
               />
