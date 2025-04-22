@@ -14,11 +14,7 @@
 
 # 二、数据下载
 ## 模型数据
-下载地址：https://drive.google.com/file/d/1xV04nQqmwbalaPUxep2M9a7PrLOZ1BUD/view?usp=drive_link
+下载地址：[https://drive.google.com/file/d/1xV04nQqmwbalaPUxep2M9a7PrLOZ1BUD/view?usp=drive_link](https://drive.google.com/file/d/124W2aSUxSQ82fC0tYPAvvatWMO9t--e8/view?usp=sharing)
 下载内容放到GUI/models中
-![img.png](img.png)
 
-## 测试视频
-下载地址：https://drive.google.com/file/d/1H-zftcOXm-oWNvNm_zPJlCnF5Gb2-ceY/view?usp=drive_link
-下载内容放到：data中
-![img_1.png](img_1.png)
+
