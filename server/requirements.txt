@@ -16,6 +16,9 @@ shapely>=2.0.0
 # 系统工具
 mediapipe>=0.10.3
 
+# webapi
+fastapi
+uvicorn
 # 选择性安装
 # onnxruntime-gpu  # 如果需要将pt转成onnx模型则采用这个
 

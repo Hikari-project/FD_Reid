@@ -20,6 +20,5 @@
 /server/static/
 
 # 忽略压缩文件
-
 *.zip
 *.pyc
