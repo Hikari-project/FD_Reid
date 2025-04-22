@@ -1,0 +1,15 @@
+[2025-04-23 01:47:24,941: faiss:185] - INFO: Failed to load GPU Faiss: name 'GpuIndexIVFFlat' is not defined. Will not load constructor refs for GPU indexes.
+[2025-04-23 01:48:18,039: faiss:185] - INFO: Failed to load GPU Faiss: name 'GpuIndexIVFFlat' is not defined. Will not load constructor refs for GPU indexes.
+[2025-04-23 01:49:16,383: libs.reid_sqlV2:33] - INFO: Successfully connected to database: ./reid.db
+[2025-04-23 01:49:16,397: system:177] - INFO: SYSTEM {"timestamp": "2025-04-23T01:49:16.397191", "error_type": "system_init", "details": {"status": "success", "db_path": "./reid.db"}}
+[2025-04-23 01:49:16,838: Algorithm.libs.detect.yolo_detector:32] - INFO: ./models/yolo12m.pt model load succeed!!!
+[2025-04-23 01:49:16,848: Algorithm.libs.search.search_engine:29] - INFO: No feat register.Total num is 0
+[2025-04-23 02:13:07,448: faiss:185] - INFO: Failed to load GPU Faiss: name 'GpuIndexIVFFlat' is not defined. Will not load constructor refs for GPU indexes.
+[2025-04-23 02:13:19,484: faiss:185] - INFO: Failed to load GPU Faiss: name 'GpuIndexIVFFlat' is not defined. Will not load constructor refs for GPU indexes.
+[2025-04-23 02:38:42,949: faiss:185] - INFO: Failed to load GPU Faiss: name 'GpuIndexIVFFlat' is not defined. Will not load constructor refs for GPU indexes.
+[2025-04-23 02:39:37,686: faiss:185] - INFO: Failed to load GPU Faiss: name 'GpuIndexIVFFlat' is not defined. Will not load constructor refs for GPU indexes.
+[2025-04-23 03:18:43,004: faiss:185] - INFO: Failed to load GPU Faiss: name 'GpuIndexIVFFlat' is not defined. Will not load constructor refs for GPU indexes.
+[2025-04-23 03:19:36,349: libs.reid_sqlV2:33] - INFO: Successfully connected to database: ./reid.db
+[2025-04-23 03:19:36,374: system:177] - INFO: SYSTEM {"timestamp": "2025-04-23T03:19:36.374514", "error_type": "system_init", "details": {"status": "success", "db_path": "./reid.db"}}
+[2025-04-23 03:19:36,707: Algorithm.libs.detect.yolo_detector:34] - INFO: ./models/yolo12s.pt model load succeed!!!
+[2025-04-23 03:19:36,707: Algorithm.libs.search.search_engine:29] - INFO: No feat register.Total num is 0

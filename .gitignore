@@ -11,9 +11,9 @@
 
 # 忽略运行数据
 *.db
-/server/logs/
-/server/outputs/
-/server/static/
+/server/GUI/logs/
+/server/GUI/outputs/
+/server/GUI/static/
 # 忽略压缩文件
 
 *.zip
