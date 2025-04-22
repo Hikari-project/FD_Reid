@@ -1,0 +1,42 @@
+<RCC>
+  <qresource prefix="icons_v2">
+    <file>images/icons_v2/ai.png</file>
+    <file>images/icons_v2/apple.png</file>
+    <file>images/icons_v2/begin.png</file>
+    <file>images/icons_v2/businessman.png</file>
+    <file>images/icons_v2/box_down.png</file>
+    <file>images/icons_v2/box_up.png</file>
+    <file>images/icons_v2/check_no.png</file>
+    <file>images/icons_v2/check_yes.png</file>
+    <file>images/icons_v2/close.png</file>
+    <file>images/icons_v2/database.png</file>
+    <file>images/icons_v2/diskette.png</file>
+    <file>images/icons_v2/face-id.png</file>
+    <file>images/icons_v2/face-recognition.png</file>
+    <file>images/icons_v2/face-scanner.png</file>
+    <file>images/icons_v2/film-reel.png</file>
+    <file>images/icons_v2/film.png</file>
+    <file>images/icons_v2/folder.png</file>
+    <file>images/icons_v2/folder2.png</file>
+    <file>images/icons_v2/gear.png</file>
+    <file>images/icons_v2/girl.png</file>
+    <file>images/icons_v2/group.png</file>
+    <file>images/icons_v2/home.png</file>
+    <file>images/icons_v2/id-card.png</file>
+    <file>images/icons_v2/image-gallery.png</file>
+    <file>images/icons_v2/instagram.png</file>
+    <file>images/icons_v2/maximize.png</file>
+    <file>images/icons_v2/menu.png</file>
+    <file>images/icons_v2/minimize-sign.png</file>
+    <file>images/icons_v2/motion-sensor.png</file>
+    <file>images/icons_v2/music.png</file>
+    <file>images/icons_v2/our_id.jpg</file>
+    <file>images/icons_v2/our_id2.jpg</file>
+    <file>images/icons_v2/pause.png</file>
+    <file>images/icons_v2/play.png</file>
+    <file>images/icons_v2/register.png</file>
+    <file>images/icons_v2/score.png</file>
+    <file>images/icons_v2/stop.png</file>
+    <file>images/icons_v2/video-camera.png</file>
+  </qresource>
+</RCC>
