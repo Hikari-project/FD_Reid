@@ -9,7 +9,8 @@
 ### 2、启动后端
 - 1、cd ./server
 - 2、pip install -r requirements.txt
-- 3、python ./GUI/app.py
+- 3、下载并解压模型放到server/GUI/models 
+- 4、python ./GUI/app.py
 
 
 # 二、数据下载
