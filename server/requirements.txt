@@ -1,10 +1,6 @@
-matplotlib>=3.2.2
-numpy<2.0.0
-
 # 视觉处理核心
 ultralytics>=8.3.1
 opencv-python>=4.5.0
-opencv-contrib-python==4.8.1.78
 faiss-cpu>=1.7.0
 lapx>=0.5.2
 
@@ -13,23 +9,14 @@ torch==2.1.2
 torchvision==0.16.2
 onnxruntime==1.16.1
 
-# 图像处理
-pillow==10.3.0
-
 # 几何计算
+numpy<2.0.0
 shapely>=2.0.0
 
 # 系统工具
-psutil>=5.9.5
 mediapipe>=0.10.3
 
-# Web服务相关
-flask>=2.0.1
-requests>=2.31.0
-
-# 数据处理
-pandas>=2.0.3
-
 # 选择性安装
-onnxruntime-gpu  # 如果支持CUDA，获得更好的推理性能
+# onnxruntime-gpu  # 如果需要将pt转成onnx模型则采用这个
+
 # pip install -r ./requirements.txt -i http://mirrors.aliyun.com/pypi/simple/ --upgrade --default-timeout=100000 --no-cache-dir --trusted-host mirrors.aliyun.com --no-deps

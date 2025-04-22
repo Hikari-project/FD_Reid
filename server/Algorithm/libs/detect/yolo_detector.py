@@ -6,6 +6,7 @@ import torch
 import Algorithm.libs.config.model_cfgs as cfgs
 
 os.environ['YOLO_VERBOSE'] = str(cfgs.YOLO_LOG)
+
 from ultralytics import YOLO
 
 from Algorithm.libs.logger.log import get_logger
@@ -14,13 +15,14 @@ log_info = get_logger(__name__)
 ISLOG = cfgs.ISLOG
 yolo_idx_names = cfgs.YOLO_LABELS
 yolo_pt_path = cfgs.YOLO_MODEL_PATH_PT
+yolo_onnx_path = cfgs.YOLO_MODEL_PATH
+print(f"yolo:{yolo_pt_path}")
+print(f"yolo_onnx:{yolo_onnx_path}")
 
 
 class YoloDetect(object):
-    def __init__(self, model_path=cfgs.YOLO_MODEL_PATH):
+    def __init__(self, model_path=yolo_pt_path):
         # 禁止打印输出
-
-            
 
         self.cuda_available = torch.cuda.is_available()
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -33,10 +35,10 @@ class YoloDetect(object):
            # torch.autocast(device_type="cuda", dtype=torch.bfloat16).__enter__()
         else:
 
-            self._model = YOLO(model_path, task="detect").to(self.device)
-            self._model_track = YOLO(model_path).to(self.device)
+            self._model = YOLO(yolo_onnx_path, task="detect").to(self.device)
+            self._model_track = YOLO(yolo_onnx_path).to(self.device)
             if ISLOG:
-                log_info.info('{} model load succeed!!!'.format(yolo_pt_path))
+                log_info.info('{} model load succeed!!!'.format(yolo_onnx_path))
            # torch.autocast(device_type="cpu", dtype=torch.bfloat16).__enter__()
 
     def create_new_instance(self):

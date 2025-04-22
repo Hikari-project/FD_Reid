@@ -104,8 +104,16 @@ class ReIDTracker:
         self.db_path = cfgs.DB_PATH
         self.log_system = log_system if log_system else LogSystem()
         self.torch_device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+
         print(f"当前使用的设备: {self.torch_device}")
-        self.model = YOLO(cfgs.YOLO_MODEL_PATH, task="detect").to(self.torch_device)
+        self.cuda_available = torch.cuda.is_available()
+        self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+
+        if self.cuda_available:
+            self.model = YOLO(cfgs.YOLO_MODEL_PATH_PT, task="detect").to(self.torch_device)
+        else:
+            self._model = YOLO(cfgs.YOLO_MODEL_PATH, task="detect").to(self.device)
+
         # 初始化数据库
         try:
             init_db(self.db_path)
@@ -908,7 +916,7 @@ class ReIDTracker:
         # 清理长时间未使用的特征
         try:
             # 连接数据库
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.db_path,timeout=10,check_same_thread=False)
             cursor = conn.cursor()
 
             # 获取当前时间戳

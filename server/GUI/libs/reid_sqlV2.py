@@ -177,7 +177,7 @@ def delete_feature(db_path, person_id):
 # 从数据库中读取所有特征向量_TEXT格式的feature,及其对应的 person_id，并将结果转换为 NumPy 数组。
 def load_sql_feat_info(db_path, db_name):
     try:
-        conn = sqlite3.connect(db_path)
+        conn = sqlite3.connect(db_path,timeout=10,check_same_thread=False)
         cursor = conn.cursor()
         cursor.execute("SELECT person_id, feature_TEXT FROM {}".format(db_name))
         feat_list, label_list = [], []
