@@ -3,7 +3,8 @@
 ### 启动前端：
 - 1、cd ./web
 - 2、pnpm install
-- 3、npm run dev
+- 3、修改.env_sample 为.env
+- 4、npm run dev
 
 ### 2、启动后端
 - 1、cd ./server
