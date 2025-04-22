@@ -8,7 +8,7 @@
 ### 2、启动后端
 - 1、cd ./server
 - 2、pip install -r requirements.txt
-- 3、python ./GUI/api.py
+- 3、python ./GUI/app.py
 
 
 # 二、数据下载
