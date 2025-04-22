@@ -3,7 +3,7 @@
 
 # 忽略前端文件
 /web/node_modules/
-/web/
+
 
 # 忽略模型文件
 *.pt
