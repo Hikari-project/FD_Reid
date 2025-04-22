@@ -1,0 +1,20 @@
+# 忽略系統文件
+.idea
+
+# 忽略前端文件
+/web/node_modules/
+
+
+# 忽略模型文件
+*.pt
+*.onnx
+
+# 忽略运行数据
+*.db
+/server/logs/
+/server/outputs/
+/server/static/
+# 忽略压缩文件
+
+*.zip
+*.pyc
