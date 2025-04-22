@@ -1,2 +1,0 @@
-2025-04-23 01:49:16 [INFO] system: SYSTEM {"timestamp": "2025-04-23T01:49:16.397191", "error_type": "system_init", "details": {"status": "success", "db_path": "./reid.db"}}
-2025-04-23 03:19:36 [INFO] system: SYSTEM {"timestamp": "2025-04-23T03:19:36.374514", "error_type": "system_init", "details": {"status": "success", "db_path": "./reid.db"}}
