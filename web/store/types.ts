@@ -79,6 +79,9 @@ export interface AppActions {
   // --- Global Status ---
   setGlobalStatus: (status: AppState['globalStatus'], message?: string) => void;
   clearGlobalError: () => void;
+
+  // --- Set State ---
+  setState: (state: Partial<AppState>) => void;
 }
 
 // Interface for a single Camera

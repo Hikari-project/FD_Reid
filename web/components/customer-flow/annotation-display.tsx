@@ -13,7 +13,7 @@ import {
   useAppStore,
   selectActiveZoneType,
 } from '@/store/useCustomerAnalysis';
-import type { Point, Annotation, ZoneType } from '@/store/types';
+import type { Point } from '@/store/types';
 
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';

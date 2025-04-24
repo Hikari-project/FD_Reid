@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useMemo, useState } from 'react'
-import { useAppStore } from '@/store/useCustomerAnalysis';
+import { backendUrl, useAppStore } from '@/store/useCustomerAnalysis';
 import type { SourceStatus } from '@/store/types';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -75,7 +75,16 @@ export default function ConfigSidebar() {
     if (sourceToDelete) {
       try {
         removeRtspSource(sourceToDelete);
-        toast.success(`移除RTSP源: ${sourceToDelete.substring(0, 30)}...`);
+        void fetch(`${backendUrl}/customer-flow/stop-analysis`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            rtsp_url: sourceToDelete,
+          }),
+        });
+        toast.success("移除RTSP源成功");
       } catch (error) {
         console.error("Error removing source:", error);
         toast.error("移除RTSP源失败.");

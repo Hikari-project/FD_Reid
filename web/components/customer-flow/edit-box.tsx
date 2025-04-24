@@ -171,7 +171,7 @@ export default function EditBox({ /* box, */ isOpen, onOpenChange }: EditBoxProp
                   placeholder="例如：30"
                   value={dataTransmission.uploadIntervalSeconds ?? ''}
                   onChange={handleIntervalChange}
-                  min="1" // Optional: add min value
+                  min="1" 
                 />
               </div>
               <div className="space-y-2">
@@ -187,7 +187,7 @@ export default function EditBox({ /* box, */ isOpen, onOpenChange }: EditBoxProp
                 <Label htmlFor="encryption-key">加密密钥</Label>
                 <Input
                   id="encryption-key"
-                  type="password" // Keep as password
+                  type="password" 
                   placeholder="请输入密钥"
                   value={dataTransmission.encryptionKey ?? ''}
                   onChange={handleKeyChange}
@@ -195,16 +195,13 @@ export default function EditBox({ /* box, */ isOpen, onOpenChange }: EditBoxProp
               </div>
             </TabsContent>
 
-             {/* Power Tab */}
              <TabsContent value="power" className="mt-4 space-y-6">
                  <h3 className="text-md font-semibold border-b pb-2">盒子状态</h3>
                  <p className="text-sm text-muted-foreground">当前状态: {powerConfig.status || '未知'}</p>
 
                  <h3 className="text-md font-semibold border-b pb-2">定时开关机</h3>
-                 {/* Adjusted layout based on image (assuming 2 times + Set button) */}
                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
                    <div className="space-y-2">
-                      {/* Assuming first time is 'ON' */}
                      <Label htmlFor="power-on-time">设置开机时间</Label>
                      <Input
                         id="power-on-time"
@@ -215,44 +212,38 @@ export default function EditBox({ /* box, */ isOpen, onOpenChange }: EditBoxProp
                       />
                    </div>
                     <div className="space-y-2">
-                      {/* Assuming second time is also 'ON' based on UI, adjust label if needed */}
                      <Label htmlFor="power-off-time">设置开机时间 2</Label>
                      <Input
-                        id="power-off-time" // Consider more descriptive ID like 'power-on-time-2'
+                        id="power-off-time" 
                         type="time"
                         placeholder="HH:MM"
                         value={powerConfig.scheduledPowerOnTimes[1] ?? ''}
                         onChange={handlePowerOffTimeChange}
                       />
                    </div>
-                   {/* Button aligned with inputs */}
                    <Button className='bg-blue-500 hover:bg-blue-600 text-white' onClick={handleSetTimes}>设置</Button>
                  </div>
 
                  <div className="flex space-x-2 pt-4">
                     <Button variant="destructive" onClick={handleShutdown}>关机</Button>
-                    {/* Consistent styling for Reboot button */}
                     <Button variant="outline" onClick={handleReboot}>重启</Button>
                  </div>
               </TabsContent>
           </Tabs>
         ) : (
-          <div className="pt-4 text-center">Loading configuration...</div> // Placeholder for loading
+          <div className="pt-4 text-center">Loading configuration...</div> 
         )}
 
-        {/* 只在网络配置和数据传输选项卡下显示页脚 */}
         {(activeTab === "network" || activeTab === "transfer") && (
           <DialogFooter className="pt-4">
             <DialogClose asChild>
               <Button type="button" variant="outline">取消</Button>
             </DialogClose>
-            {/* Save Button - Often needed */}
             <Button 
               className='bg-blue-500 hover:bg-blue-600 text-white'
               type="button" onClick={() => {
                 console.log("Save clicked. Implement save logic using store actions.");
-                // Example: useBoxStore.getState().saveBoxConfiguration();
-                onOpenChange(false); // Close dialog on save
+                onOpenChange(false); 
             }}>
               保存
             </Button>

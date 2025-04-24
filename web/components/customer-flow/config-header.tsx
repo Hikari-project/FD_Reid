@@ -84,7 +84,7 @@ export default function ConfigHeader() {
                   .filter(line => line.length > 0 && (line.startsWith('rtsp://') || line.startsWith('http://') || line.startsWith('https://'))); // Basic validation
 
                 if (urls.length === 0) {
-                  throw new Error("No valid RTSP URLs found in the file."); 
+                  throw new Error("文件中没有有效的 RTSP URL."); 
                 }
 
                 setGlobalStatus('processing_file');
@@ -92,7 +92,7 @@ export default function ConfigHeader() {
                 setGlobalStatus('idle'); 
                 resolve();
               } else {
-                throw new Error("File is empty or could not be read."); 
+                throw new Error("文件为空或无法读取."); 
               }
             } catch (innerError: any) { 
                console.error("File processing error (inner):", innerError);
@@ -122,7 +122,6 @@ export default function ConfigHeader() {
     );
   }, [addRtspSources, setGlobalStatus]);
 
-
   const handleManualAdd = useCallback(async () => {
     const url = manualRtspInput.trim();
     if (!url) {
@@ -133,17 +132,6 @@ export default function ConfigHeader() {
       toast.error("URL格式错误. 必须以 rtsp:// 开头");
       return;
     }
-
-    // if (url !== 'rtsp://47.97.71.139:8003/video_feed4' 
-    //   && url !== 'rtsp://47.97.71.139:8003/video_feed3'
-    //   && url !== 'rtsp://47.97.71.139:8003/video_feed2'
-    //   && url !== 'rtsp://47.97.71.139:8003/video_feed1'
-    // ) {
-    //   setTimeout(() => {
-    //     toast.error("连接失败，请检查 URL 是否正确。");
-    //   }, 2000);
-    //   return;
-    // }
 
     setGlobalStatus('processing_file');
     toast.promise(
@@ -191,7 +179,8 @@ export default function ConfigHeader() {
       }
     }
   }, [canStartAnalysis, activeSourceUrl, startAnalysis, activeSource]);
-
+  
+  // 舍弃
   const handleEnterAnnotationMode = useCallback(() => {
     if (canManuallyEnterAnnotation && activeSource) {
       const targetMode = activeSource.annotation.isClosed ? 'line_selection' : 'drawing';
@@ -251,17 +240,6 @@ export default function ConfigHeader() {
         </div>
         <div className='flex flex-col gap-2'>
         <div className="flex items-center gap-3 justify-end flex-wrap">
-            {/* <Button
-                onClick={handleEnterAnnotationMode}
-                disabled={!canManuallyEnterAnnotation || isProcessing || isSourceBusy}
-                variant="outline"
-                title={!activeSource ? "Select a source first" : !canManuallyEnterAnnotation ? "Cannot annotate in current state" : "Start/Edit Annotation"}
-            >
-                编辑标注
-            </Button>
-
-           <div className="border-l h-8 mx-2"></div> */}
-
           <Button
             onClick={handleUndoClick}
             disabled={!canUndo || isProcessing || isSourceBusy}

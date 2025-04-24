@@ -9,7 +9,7 @@ import type {
   ZoneType,
 } from '@/store/types';
 
-const backendUrl = "http://127.0.0.1:3009";
+export const backendUrl = "http://127.0.0.1:3009";
 
 async function fetchFirstFrameFromBackend(
   rtspUrl: string
@@ -426,6 +426,29 @@ export const useAppStore = create<AppState & AppActions>()(
           }
         });
       },
+
+      setState: (loadedState) => {
+        set(state => {
+          if (loadedState.rtspSources) {
+            // Potentially enhance this merging logic if needed
+            // e.g., merge individual sources instead of overwriting the whole object
+            Object.assign(state.rtspSources, loadedState.rtspSources);
+          }
+          if (loadedState.activeSourceUrl !== undefined) {
+              state.activeSourceUrl = loadedState.activeSourceUrl;
+          }
+          if (loadedState.annotationMode !== undefined) {
+              state.annotationMode = loadedState.annotationMode;
+          }
+          if (loadedState.globalStatus !== undefined) {
+              state.globalStatus = loadedState.globalStatus;
+          }
+          if (loadedState.globalErrorMessage !== undefined) {
+              state.globalErrorMessage = loadedState.globalErrorMessage;
+          }
+          console.log('[STORE] State updated from backend data');
+        });
+      }
     })),
     {
       name: 'customer-analysis-store',
