@@ -1,6 +1,0 @@
-{"timestamp": "2025-04-23T01:54:59.523088", "type": "system", "data": {"timestamp": "2025-04-23T01:54:59.523088", "error_type": "system_init", "details": {"status": "success", "db_path": "./reid.db"}}}
-{"timestamp": "2025-04-23T01:56:13.596924", "type": "system", "data": {"timestamp": "2025-04-23T01:56:13.596924", "error_type": "system_init", "details": {"status": "success", "db_path": "./reid.db"}}}
-{"timestamp": "2025-04-23T02:17:41.742030", "type": "system", "data": {"timestamp": "2025-04-23T02:17:41.742030", "error_type": "system_init", "details": {"status": "success", "db_path": "./reid.db"}}}
-{"timestamp": "2025-04-23T02:22:36.331193", "type": "system", "data": {"timestamp": "2025-04-23T02:22:36.331193", "error_type": "system_init", "details": {"status": "success", "db_path": "./reid.db"}}}
-{"timestamp": "2025-04-23T02:26:30.063403", "type": "system", "data": {"timestamp": "2025-04-23T02:26:30.063403", "error_type": "system_init", "details": {"status": "success", "db_path": "./reid.db"}}}
-{"timestamp": "2025-04-23T03:23:42.303269", "type": "system", "data": {"timestamp": "2025-04-23T03:23:42.303269", "error_type": "system_init", "details": {"status": "success", "db_path": "./reid.db"}}}

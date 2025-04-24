@@ -4,13 +4,13 @@
 # 忽略前端文件
 /web/node_modules/
 
-
 # 忽略模型文件
 *.pt
 *.onnx
 
 # 忽略运行数据
 *.db
+
 /server/GUI/logs/
 /server/GUI/outputs/
 /server/GUI/static/
