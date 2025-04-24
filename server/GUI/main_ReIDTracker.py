@@ -12,13 +12,15 @@ from pydantic import BaseModel
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(project_root)
 import torch
+
 sys.path.append('../')
 
 from log.log import LogSystem, GlobalCounter
 
 import Algorithm.libs.config.model_cfgs as cfgs
 
-from libs.reid_sqlV2 import init_db, add_feature, update_feature, delete_feature, load_features_from_sqlite, get_max_person_id, clear_all_features
+from libs.reid_sqlV2 import init_db, add_feature, update_feature, delete_feature, load_features_from_sqlite, \
+    get_max_person_id, clear_all_features
 
 import threading
 import json
@@ -32,7 +34,7 @@ import asyncio
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 # 是否渲染窗口
-show=False
+show = True
 # -*- coding:utf-8 -*-
 """
 @Author: self-798
@@ -54,7 +56,6 @@ from datetime import datetime
 from typing import Union, List
 from Reid_module import ReIDTracker
 
-
 # 获取主事件循环
 mainloop = asyncio.get_event_loop()
 asyncio.set_event_loop(mainloop)
@@ -70,6 +71,7 @@ class NumpyEncoder(json.JSONEncoder):
         elif isinstance(obj, np.ndarray):
             return obj.tolist()
         return super(NumpyEncoder, self).default(obj)
+
 
 @dataclass
 class StreamInfo:
@@ -90,7 +92,8 @@ class StreamManager:
     管理视频流和文件的类，支持RTSP和视频文件，提供配置管理和线程安全操作
     """
 
-    def __init__(self, temp_dir=None, max_reconnect=10, mjpeg_server_port=8554,frame_queue=[asyncio.Queue(maxsize=10)]):
+    def __init__(self, temp_dir=None, max_reconnect=10, mjpeg_server_port=8554,
+                 frame_queue=[asyncio.Queue(maxsize=10)]):
         """
         初始化流管理器
 
@@ -111,6 +114,16 @@ class StreamManager:
 
         # 已处理的队列
         self.handle_frame = frame_queue
+        # 已处理队列的状态管理,是否可用
+        self.handle_queue_status = {
+            0: True,
+            1: True,
+            2: True,
+            3: True,
+        }
+
+    def load_model(self):
+        pass
 
     def is_rtsp_url(self, url: str) -> bool:
         """
@@ -137,46 +150,14 @@ class StreamManager:
         _, ext = os.path.splitext(path)
         return ext.lower() in video_extensions
 
-    def generate_mjpeg_url(self, url: str, index: int) -> str:
-        """
-        为流生成MJPEG URL
-
-        Args:
-            url: 原始URL
-            index: 流索引
-
-        Returns:
-            str: MJPEG URL
-        """
-        # 如果是RTSP URL，尝试转换为MJPEG URL
-        if self.is_rtsp_url(url):
-            # 简单转换RTSP到HTTP
-            mjpeg_url = url.replace("rtsp://", "http://")
-
-            # 尝试提取IP和端口
-            match = re.match(r'rtsp://([^:/]+)(?::(\d+))?', url)
-            if match:
-                ip = match.group(1)
-                # 默认使用配置的MJPEG服务器端口
-                mjpeg_url = f"http://{ip}:{self.mjpeg_server_port}/live/stream{index}"
-            else:
-                # 如果无法解析，使用本地MJPEG服务器
-                mjpeg_url = f"http://localhost:{self.mjpeg_server_port}/live/stream{index}"
-        else:
-            # 对于视频文件，使用本地MJPEG服务器
-            mjpeg_url = f"http://localhost:{self.mjpeg_server_port}/video/stream{index}"
-
-        return mjpeg_url
-
-
-    def setup_streams(self, config_list: List[Dict[str, Any]], show_windows=True) -> List[Dict[str, str]]:
+    def setup_streams(self, config_list: List[Dict[str, Any]], queue_index=0, show_windows=True) -> List[
+        Dict[str, str]]:
         """
         设置流列表
-
         Args:
             config_list: 配置列表，每个元素包含URL和区域配置
+            queue_index: 这个流输出的队列下标
             show_windows: 是否显示视频窗口
-
         Returns:
             List[Dict[str, str]]: 原始URL和对应MJPEG URL列表
         """
@@ -186,84 +167,83 @@ class StreamManager:
 
             # 处理新的配置列表
             mjpeg_list = []
+            config = config_list[0]  # 后续要处理成只识别单个的
 
-            for i, config in enumerate(config_list[:4]):  # 最多处理4个流
-                # 验证必要的配置项
+            # 验证必要的配置项
 
-                # 获取路由
-                url = config["rtsp_url"]
+            # 获取路由
+            url = config["rtsp_url"]
 
-                # 检查是否为RTSP流或视频文件
-                is_rtsp = self.is_rtsp_url(url)
-                is_video = self.is_video_file(url) if not is_rtsp else False
+            # 检查是否为RTSP流或视频文件
+            is_rtsp = self.is_rtsp_url(url)
+            is_video = self.is_video_file(url) if not is_rtsp else False
 
-                if not (is_rtsp or is_video):
-                    print(f"警告: URL '{url}' 既不是RTSP流也不是视频文件，将尝试作为视频文件处理")
-                    is_video = True
+            if not (is_rtsp or is_video):
+                print(f"警告: URL '{url}' 既不是RTSP流也不是视频文件，将尝试作为视频文件处理")
+                is_video = True
 
-                # 检查区域配置
-                if "points" not in config or not config["points"]:
-                    # 创建默认区域配置
-                    config["points"] = [[100, 400], [500, 400], [500, 200], [100, 200]]
+            # 检查区域配置
+            if "points" not in config or not config["points"]:
+                # 创建默认区域配置
+                config["points"] = [[100, 400], [500, 400], [500, 200], [100, 200]]
 
-                # if "b1" not in config or not config["b1"]:
-                #     # 创建默认b1配置
-                #     config["b1"] = [config["points"][0], config["points"][1]]
-                #
+            # if "b1" not in config or not config["b1"]:
+            #     # 创建默认b1配置
+            #     config["b1"] = [config["points"][0], config["points"][1]]
+            #
 
-                if "passway" not in config or not config["passway"]:
-                    # 创建默认b1配置
-                    config["b1"] = [config["points"][0], config["points"][1]]
+            if "passway" not in config or not config["passway"]:
+                # 创建默认b1配置
+                config["b1"] = [config["points"][0], config["points"][1]]
 
-                # 取第一个config
-                config["b1"]=config["passway"][0]
+            # 取第一个config
+            config["b1"] = config["passway"][0]
 
+            if "b2" not in config:
+                # 创建默认b2配置 (中间线)
+                x1 = (config["points"][0][0] + config["points"][3][0]) // 2
+                y1 = (config["points"][0][1] + config["points"][3][1]) // 2
+                x2 = (config["points"][1][0] + config["points"][2][0]) // 2
+                y2 = (config["points"][1][1] + config["points"][2][1]) // 2
+                config["b2"] = [[x1, y1], [x2, y2]]
 
-                if "b2" not in config:
-                    # 创建默认b2配置 (中间线)
-                    x1 = (config["points"][0][0] + config["points"][3][0]) // 2
-                    y1 = (config["points"][0][1] + config["points"][3][1]) // 2
-                    x2 = (config["points"][1][0] + config["points"][2][0]) // 2
-                    y2 = (config["points"][1][1] + config["points"][2][1]) // 2
-                    config["b2"] = [[x1, y1], [x2, y2]]
+            if "g2" not in config:
+                # 创建默认g2配置 (顶线)
+                config["g2"] = [config["points"][3], config["points"][2]]
 
-                if "g2" not in config:
-                    # 创建默认g2配置 (顶线)
-                    config["g2"] = [config["points"][3], config["points"][2]]
+            # 生成配置文件路径
+            config_path = os.path.join(self.temp_dir, f"stream_config_{queue_index}.json")
 
-                # 生成配置文件路径
-                config_path = os.path.join(self.temp_dir, f"stream_config_{i}.json")
+            # 保存配置到JSON文件
+            with open(config_path, 'w') as f:
+                json.dump(config, f, cls=NumpyEncoder)
 
-                # 保存配置到JSON文件
-                with open(config_path, 'w') as f:
-                    json.dump(config, f, cls=NumpyEncoder)
+            # 生成MJPEG URL
+            # mjpeg_url = self.generate_mjpeg_url(url, i)
+            mjpeg_url = ''
+            # 创建流信息
+            stream_info = StreamInfo(
+                url=url,
+                mjpeg_url=mjpeg_url,
+                is_rtsp=is_rtsp,
+                config=config,
+                config_path=config_path,
+                active=True,
+                last_update=time.time(),
+                reconnect_count=0,
+                show_window=show_windows
+            )
 
-                # 生成MJPEG URL
-                mjpeg_url = self.generate_mjpeg_url(url, i)
+            # 添加到流列表
+            self.streams.append(stream_info)
 
-                # 创建流信息
-                stream_info = StreamInfo(
-                    url=url,
-                    mjpeg_url=mjpeg_url,
-                    is_rtsp=is_rtsp,
-                    config=config,
-                    config_path=config_path,
-                    active=True,
-                    last_update=time.time(),
-                    reconnect_count=0,
-                    show_window=show_windows
-                )
-
-                # 添加到流列表
-                self.streams.append(stream_info)
-
-                # 添加到返回列表
-                mjpeg_list.append({
-                    "source_url": url,
-                    "mjpeg_url": f"/customer-flow/video_feed?video_id={i}",
-                    "is_rtsp": is_rtsp,
-                    "stream_index": i
-                })
+            # 添加到返回列表
+            mjpeg_list.append({
+                "source_url": url,
+                "mjpeg_url": f"/customer-flow/video_feed?video_id={queue_index}",
+                "is_rtsp": is_rtsp,
+                "stream_index": queue_index
+            })
 
             return mjpeg_list
 
@@ -399,7 +379,7 @@ class StreamManager:
         """清除所有流信息（内部方法）"""
         self.streams = []
 
-    def process_quad_videos(self,video_path1=None, video_path2=None, video_path3=None, video_path4=None,
+    def process_quad_videos(self, video_path1=None, video_path2=None, video_path3=None, video_path4=None,
                             tempDataPath1='v1.json', tempDataPath2='v2.json', tempDataPath3='v3.json',
                             tempDataPath4='v4.json',
                             skip_frames=2, match_thresh=0.15, is_track=True, save_video=True,
@@ -601,10 +581,10 @@ class StreamManager:
 
                         # 往第i个队列里面插入已处理好的帧
                         asyncio.run_coroutine_threadsafe(self.handle_frame[i].put(processed_frame), mainloop)
-                       # print(self.handle_frame.qsize())
-                       # print(threading.current_thread())
+                        # print(self.handle_frame.qsize())
+                        # print(threading.current_thread())
                         if show:
-                            cv2.imshow("test1",processed_frame)
+                            cv2.imshow("test1", processed_frame)
                             cv2.waitKey(1)
 
                         # 显示处理后的帧
@@ -675,6 +655,382 @@ class StreamManager:
                 print(f"无法获取{window_names[i]}的统计结果: {e}")
                 results.append(None)
         return results
+
+    def process_video_in_thread(self, video_source, temp_data={},
+                                skip_frames=2, match_thresh=0.15, is_track=True, save_video=False,
+                                stream_manager=None, show_window=True, window_name=None, queue_index=0):
+        """
+        在单独的线程中处理视频源（可以是OpenCV的VideoCapture对象或RTSP URL）
+
+        Args:
+            video_source: 视频源，可以是OpenCV的VideoCapture对象或RTSP URL字符串
+            temp_data: 临时数据
+            skip_frames: 跳帧数
+            match_thresh: 匹配阈值
+            is_track: 是否启用跟踪
+            save_video: 是否保存结果视频
+            stream_manager: 流管理器实例，用于更新状态
+            show_window: 是否显示窗口
+            window_name: 窗口名称，如果为None，则自动生成
+            queue_index: 处理后的帧放入哪个队列的索引
+
+        Returns:
+            thread_info: 包含线程对象、停止事件等信息的字典
+        """
+        import threading
+        import cv2
+        import time
+        import os
+
+        # 创建停止事件
+        stop_event = threading.Event()
+
+        # 如果没有指定窗口名称，创建一个
+        if window_name is None:
+            stream_id = 0
+            if stream_manager:
+                stream_id = stream_manager.get_next_stream_id()
+            window_name = f"Video Stream {stream_id}"
+        else:
+            stream_id = window_name.split()[-1] if window_name.split()[-1].isdigit() else 0
+
+        def _process_video_task():
+            """线程内运行的任务函数"""
+            # 创建日志系统
+            log_system = LogSystem()
+
+            # 创建跟踪器
+            tracker = ReIDTracker(log_system=log_system)
+
+            # 判断视频源类型
+            is_cap_object = isinstance(video_source, cv2.VideoCapture)
+            is_rtsp = False if is_cap_object else str(video_source).lower().startswith('rtsp://')
+
+            # 获取视频捕获对象
+            if is_cap_object:
+                cap = video_source
+                video_path = None
+            else:
+                video_path = video_source
+                # 对RTSP流进行特殊处理
+                if is_rtsp:
+                    print(f"配置RTSP流 {video_source}")
+                    # 设置环境变量以使用TCP传输协议
+                    os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|stimeout;5000000"
+                    cap = cv2.VideoCapture(video_source, cv2.CAP_FFMPEG)
+                    cap.set(cv2.CAP_PROP_BUFFERSIZE, 3)  # 设置缓冲区大小
+                    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('H', '2', '6', '4'))  # 使用H264解码器
+                    try:
+                        cap.set(cv2.CAP_PROP_TIMEOUT, 10000)  # 设置超时时间(毫秒)
+                    except:
+                        pass
+                else:
+                    # 普通视频文件
+                    cap = cv2.VideoCapture(video_source)
+
+            # 检查是否成功打开
+            if not cap.isOpened():
+                print(f"无法打开视频源")
+                if stream_manager:
+                    stream_manager.update_stream_status(stream_id, False)
+                return
+
+            # 设置跟踪器的处理环境
+            print("temp_data:", str(temp_data))
+            if not tracker.setup_processing(None, temp_data):
+                print(f"无法设置视频处理环境")
+                cap.release()
+                if stream_manager:
+                    stream_manager.update_stream_status(stream_id, False)
+                return
+
+            # 设置视频写入器（如果需要保存）
+            if save_video and video_path:  # 只有当提供了视频路径时才保存
+                tracker.setup_video_writer(video_path, suffix=f"_processed_{stream_id}")
+
+            # 如果需要显示，创建窗口
+            if show_window:
+                cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+
+            # 记录帧计数和上次重连时间
+            frame_count = 0
+            last_reconnect_time = 0
+            reconnect_interval = 5  # 重连间隔，秒
+
+            # 通知流管理器流已开始
+            if stream_manager:
+                stream_manager.update_stream_status(stream_id, True)
+
+            # 主循环
+            while not stop_event.is_set():
+                try:
+                    # 尝试读取帧
+                    ret, frame = cap.read()
+
+                    # 处理读取失败的情况，可能是视频结束或RTSP断开
+                    max_attempt = 10
+                    if not ret:
+                        for i in range(max_attempt):
+                            ret, frame = cap.read()
+                            if ret:
+                                break
+
+                    # 连续10次失败可能就是rtsp断开，那就重新连接
+                    if not ret:
+                        current_time = time.time()
+                        # 对于RTSP流，尝试重连
+                        if is_rtsp and video_path:
+                            # 更新重连计数
+                            if stream_manager:
+                                stream_manager.update_stream_status(stream_id, True, reconnect_increment=True)
+
+                            # 检查是否应该继续重连
+                            should_reconnect = True
+                            if stream_manager:
+                                should_reconnect = stream_manager.should_reconnect(stream_id)
+
+                            if should_reconnect and current_time - last_reconnect_time > reconnect_interval:
+                                print(f"{window_name}连接断开，尝试重新连接...")
+                                cap.release()
+                                time.sleep(1)  # 等待1秒后尝试重新连接
+
+                                # 创建新的捕获对象
+                                os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|stimeout;5000000"
+                                new_cap = cv2.VideoCapture(video_path, cv2.CAP_FFMPEG)
+                                if new_cap.isOpened():
+                                    # 对RTSP流进行特殊配置
+                                    new_cap.set(cv2.CAP_PROP_BUFFERSIZE, 3)
+                                    new_cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('H', '2', '6', '4'))
+                                    try:
+                                        new_cap.set(cv2.CAP_PROP_TIMEOUT, 10000)  # 设置超时时间(毫秒)
+                                    except:
+                                        pass
+
+                                    # 更新捕获对象
+                                    cap = new_cap
+                                    last_reconnect_time = current_time
+                                    print(f"{window_name}重新连接成功")
+
+                                    # 尝试读取一帧
+                                    ret, frame = cap.read()
+                                    if not ret:
+                                        print(f"{window_name}重新连接后无法读取帧")
+                                        continue
+                                else:
+                                    print(f"{window_name}重新连接失败")
+                                    last_reconnect_time = current_time
+                                    continue
+                            else:
+                                # 未达到重连间隔或超过最大重连次数，跳过本次处理
+                                continue
+                        else:
+                            # 非RTSP流，视频可能已结束
+                            print(f"{window_name}读取完毕或出错。")
+                            if stream_manager:
+                                stream_manager.update_stream_status(stream_id, False)
+                            break
+
+                    # 增加帧计数
+                    frame_count += 1
+
+                    # 跳帧处理
+                    if skip_frames > 0 and frame_count % skip_frames != 0:
+                        continue
+
+                    # 使用跟踪器处理帧
+                    processed_frame, info = tracker.process_frame(frame, 0, match_thresh, is_track)
+
+                    # 将处理后的帧放入队列
+                    if processed_frame is not None:
+                        try:
+                            asyncio.run_coroutine_threadsafe(self.handle_frame[queue_index].put(processed_frame),
+                                                             mainloop)
+                        except Exception as e:
+                            print(f"无法将帧放入队列: {e}")
+
+                    # 显示处理后的帧
+                    if processed_frame is not None and show_window:
+                        cv2.imshow(window_name, processed_frame)
+
+                        # 按 'q' 键退出单个窗口
+                        key = cv2.waitKey(1) & 0xFF
+                        if key == ord('q'):
+                            break
+
+                except Exception as e:
+                    print(f"处理{window_name}时出错: {str(e)}")
+                    import traceback
+                    traceback.print_exc()
+
+                    # 对于RTSP流错误处理
+                    if is_rtsp and video_path:
+                        if stream_manager:
+                            stream_manager.update_stream_status(stream_id, True, reconnect_increment=True)
+
+                        # 检查是否应该继续重连
+                        should_reconnect = True
+                        if stream_manager:
+                            should_reconnect = stream_manager.should_reconnect(stream_id)
+
+                        if not should_reconnect:
+                            if stream_manager:
+                                stream_manager.update_stream_status(stream_id, False)
+                            break
+                    else:
+                        if stream_manager:
+                            stream_manager.update_stream_status(stream_id, False)
+                        break
+
+            # 释放资源
+            if cap is not None:
+                cap.release()
+
+            try:
+                tracker.release()
+            except Exception as e:
+                print(f"释放{window_name}资源时出错: {str(e)}")
+
+            # 关闭窗口
+            if show_window:
+                try:
+                    cv2.destroyWindow(window_name)
+                except Exception as e:
+                    pass
+
+            # 通知流管理器流已结束
+            if stream_manager:
+                stream_manager.update_stream_status(stream_id, False)
+
+            # 打印统计结果
+            try:
+                counts = log_system.get_counts()
+                print(f"{window_name}统计结果:")
+                print(f"Enter Count: {counts['enter']}")
+                print(f"Exit Count: {counts['exit']}")
+                print(f"Pass Count: {counts['pass']}")
+                print(f"Re-enter Count: {counts['re_enter']}")
+            except Exception as e:
+                print(f"无法获取{window_name}的统计结果: {e}")
+
+        # 创建并启动线程
+        thread = threading.Thread(target=_process_video_task, daemon=True)
+        thread.start()
+
+        # 返回包含线程信息的字典
+        return {
+            "thread": thread,
+            "stop_event": stop_event,
+            "window_name": window_name,
+            "stream_id": stream_id
+        }
+
+    def get_valid_queue_index(self):
+        """
+        查询目前哪个队列可以用
+        :return:
+        """
+        print(self.handle_queue_status.items())
+        for key, value in self.handle_queue_status.items():
+            if value:
+                self.handle_frame[key] = asyncio.Queue()  # 清空这个队列
+                self.handle_queue_status[key] = False  # 这个队列已使用
+                return key
+
+    def start_video_analysis(self, video_sources, temp_data_paths=None,
+                             skip_frames=2, match_thresh=0.15, is_track=True, save_video=False,
+                             show_windows=None, window_names=None):
+        """
+        开始分析多个视频源
+
+        Args:
+            video_sources: 视频源列表，可以是视频路径、RTSP URL或VideoCapture对象
+            temp_data_paths: 临时数据路径列表，如果为None则使用默认值
+            skip_frames: 跳帧数
+            match_thresh: 匹配阈值
+            is_track: 是否启用跟踪
+            save_video: 是否保存结果视频
+            show_windows: 是否显示窗口的列表，对应每个视频
+            window_names: 窗口名称列表，如果为None则自动生成
+
+        Returns:
+            threads_info: 包含所有线程信息的字典列表
+        """
+        # 初始化参数
+        if temp_data_paths is None:
+            temp_data_paths = ['v1.json'] * len(video_sources)
+
+        if show_windows is None:
+            show_windows = [False] * len(video_sources)
+
+        if window_names is None:
+            window_names = [f"Video {i + 1}" for i in range(len(video_sources))]
+
+        # 确保列表长度一致
+        n = len(video_sources)
+        temp_data_paths = temp_data_paths[:n] + ['v1.json'] * (n - len(temp_data_paths))
+        show_windows = show_windows[:n] + [True] * (n - len(show_windows))
+        window_names = window_names[:n] + [f"Video {i + len(window_names) + 1}" for i in range(n - len(window_names))]
+
+        # 创建流管理器
+        stream_manager = self  # 使用当前类实例作为流管理器
+
+        # 启动所有视频源的分析
+        threads_info = []
+        for i, (source, temp_path, show_window, window_name) in enumerate(
+                zip(video_sources, temp_data_paths, show_windows, window_names)):
+            if source:  # 跳过为None的视频源
+                thread_info = self.process_video_in_thread(
+                    video_source=source,
+                    temp_data_path=temp_path,
+                    skip_frames=skip_frames,
+                    match_thresh=match_thresh,
+                    is_track=is_track,
+                    save_video=save_video,
+                    stream_manager=stream_manager,
+                    show_window=show_window,
+                    window_name=window_name,
+                    queue_index=i
+                )
+                threads_info.append(thread_info)
+
+        # 返回线程信息列表，以便后续可以停止它们
+        return threads_info
+
+    def stop_video_analysis(self, threads_info, timeout=5):
+        """
+        停止视频分析线程
+
+        Args:
+            threads_info: 线程信息字典列表，由start_video_analysis返回
+            timeout: 等待线程终止的超时时间（秒）
+
+        Returns:
+            successful: 是否成功停止所有线程
+        """
+        # 设置所有停止事件
+        for thread_info in threads_info:
+            thread_info["stop_event"].set()
+
+        # 等待所有线程终止
+        all_stopped = True
+        for thread_info in threads_info:
+            thread = thread_info["thread"]
+            window_name = thread_info["window_name"]
+
+            # 等待线程终止，超时后强制终止（虽然Python线程不能真正强制终止）
+            thread.join(timeout=timeout)
+            if thread.is_alive():
+                print(f"警告: {window_name}线程未能在{timeout}秒内终止")
+                all_stopped = False
+
+        # 确保关闭所有窗口
+        try:
+            cv2.destroyAllWindows()
+        except:
+            pass
+
+        return all_stopped
+
     def start_processing(self, skip_frames=4, match_thresh=0.15, is_track=True, save_video=False):
         """
         开始处理所有设置的视频流
@@ -734,8 +1090,6 @@ class StreamManager:
             self.processing_thread.start()
             return True
 
-
-
     def stop_processing(self, timeout=5) -> bool:
         """
         停止视频流处理
@@ -745,11 +1099,10 @@ class StreamManager:
             bool: 是否成功停止处理
         """
         with self.lock:
-            if not self.stop_event.is_set():
-                self.stop_event.set()
-                if self.processing_thread and self.processing_thread.is_alive():
-                    self.processing_thread.join(timeout=timeout)
-                    return not self.processing_thread.is_alive()
+            self.stop_event.set()
+            if self.processing_thread and self.processing_thread.is_alive():
+                self.processing_thread.join(timeout=timeout)
+                return not self.processing_thread.is_alive()
             return True
 
     def is_processing(self) -> bool:
@@ -760,9 +1113,7 @@ class StreamManager:
         """
         return self.processing_thread is not None and self.processing_thread.is_alive()
 
-
-
-    def format_data(self,video_datas):
+    def format_data(self, video_datas):
         config_list = [
             {
                 "rtsp_video": 'rtsp://localhost:5555/live',
@@ -805,14 +1156,12 @@ class StreamManager:
         # 注意: 这是非阻塞的，函数会立即返回，处理在后台线程中进行
         # self.start_processing(skip_frames=4, match_thresh=0.15, is_track=True)
 
-
-
-    async def consume_frame(self,video_id):
-       # print(threading.current_thread())
-        #video_id=0
+    async def consume_frame(self, video_id):
+        # print(threading.current_thread())
+        # video_id=0
         print("视频流：{}".format(video_id))
         while True:
-            print('...1')
+            #  print('...1')
             frame = await self.handle_frame[video_id].get()
             if show:
                 cv2.imshow('frame', frame)
@@ -826,32 +1175,32 @@ class StreamManager:
                     _frame_cache + b'\r\n'
             )
 
-    async def consume_frame_queue(self,frame_queue):
-       # print(threading.current_thread())
-       # 准备配置
-       config_list = [
-           {
-               "rtsp_url": 'rtsp://localhost:5558/live',
-               "points": [[500, 600], [750, 600], [750, 400], [500, 400]]
-           }
-       ]
+    async def consume_frame_queue(self, frame_queue):
+        # print(threading.current_thread())
+        # 准备配置
+        config_list = [
+            {
+                "rtsp_url": 'rtsp://localhost:5558/live',
+                "points": [[500, 600], [750, 600], [750, 400], [500, 400]]
+            }
+        ]
 
-       # 设置流并获取MJPEG URL列表
-       mjpeg_list =self.setup_streams(config_list, show_windows=True)
-       # 打印MJPEG URL列表 (这些URL可以提供给前端显示)
-       print("MJPEG流列表:")
-       for stream in mjpeg_list:
-           print(f"原始URL: {stream['source_url']}")
-           print(f"MJPEG URL: {stream['mjpeg_url']}")
-           print(f"是否RTSP: {stream['is_rtsp']}")
-           print(f"流索引: {stream['stream_index']}")
-           print()
+        # 设置流并获取MJPEG URL列表
+        mjpeg_list = self.setup_streams(config_list, show_windows=True)
+        # 打印MJPEG URL列表 (这些URL可以提供给前端显示)
+        print("MJPEG流列表:")
+        for stream in mjpeg_list:
+            print(f"原始URL: {stream['source_url']}")
+            print(f"MJPEG URL: {stream['mjpeg_url']}")
+            print(f"是否RTSP: {stream['is_rtsp']}")
+            print(f"流索引: {stream['stream_index']}")
+            print()
 
-       # 开始处理视频流
-       # 注意: 这是非阻塞的，函数会立即返回，处理在后台线程中进行
-       self.start_processing(skip_frames=4, match_thresh=0.15, is_track=True)
+        # 开始处理视频流
+        # 注意: 这是非阻塞的，函数会立即返回，处理在后台线程中进行
+        self.start_processing(skip_frames=4, match_thresh=0.15, is_track=True)
 
-       while True:
+        while True:
             frame = await frame_queue.get()
             # cv2.imshow('frame', frame)
             # cv2.waitKey(1)

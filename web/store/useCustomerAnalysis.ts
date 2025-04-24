@@ -69,7 +69,7 @@ async function startAnalysisOnBackend(
     ]
   }
 
-  const response = await fetch(`${backendUrl}/customer-flow/custome-analysis`, { 
+  const response = await fetch(`${backendUrl}/customer-flow/custome-analysisV2`, {
     method: 'POST', 
     body: JSON.stringify(payload), 
     headers: {
