@@ -60,6 +60,15 @@ def is_img_not_valid(image_path):
         return True
     else:
         return False
+
+def is_img_not_validV2(image_path):
+    ret1, mean, std = is_abnormal_image(image_path)
+    ret2, entropy = is_abnormal_image_hist(image_path)
+    if ret1 and ret2:
+
+        return True
+    else:
+        return False
 if __name__ == '__main__':
 
     imgpath=r'H:\fd_project\FD\FD_REID_Project\GUI\static'

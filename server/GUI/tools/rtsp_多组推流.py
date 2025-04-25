@@ -45,8 +45,8 @@ if __name__ == '__main__':
     video_list = [
         r"H:\fd_project\FD_REID_Project\data\test1.mp4",
         r"H:\fd_project\FD_REID_Project\data\test2.mp4",
-        r"H:\fd_project\FD_REID_Project\data\FD_video_1216\901_20241216_174435.mkv",
-        r"H:\fd_project\FD_REID_Project\data\FD_video_1216\801_20241216_174432.mkv",
+         r"H:\fd_project\FD_REID_Project\data\FD_video_1216\901_20241216_174435.mkv",
+         r"H:\fd_project\FD_REID_Project\data\FD_video_1216\801_20241216_174432.mkv",
     ]
 
     # 启动所有推流任务

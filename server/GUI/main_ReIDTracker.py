@@ -55,7 +55,7 @@ import time
 from datetime import datetime
 from typing import Union, List
 from Reid_module import ReIDTracker
-
+from libs.rtsp_check import is_img_not_validV2
 # 获取主事件循环
 mainloop = asyncio.get_event_loop()
 asyncio.set_event_loop(mainloop)
@@ -848,6 +848,9 @@ class StreamManager:
 
 
                         continue
+                    # 如果拉流是坏的就不推理
+                    if  is_img_not_validV2(frame):
+                       continue
 
                     # 使用跟踪器处理帧
                     processed_frame, info = tracker.process_frame(frame, 0, match_thresh, is_track)

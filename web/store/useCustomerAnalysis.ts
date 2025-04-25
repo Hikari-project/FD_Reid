@@ -9,7 +9,8 @@ import type {
   ZoneType,
 } from '@/store/types';
 
-export const backendUrl = process.env.VITE_BACKEND_URL;
+//export const backendUrl = process.env.VITE_BACKEND_URL;
+export const backendUrl = 'http://127.0.0.1:3009'
 
 async function fetchFirstFrameFromBackend(
   rtspUrl: string
