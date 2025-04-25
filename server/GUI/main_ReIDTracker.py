@@ -34,7 +34,7 @@ import asyncio
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 # 是否渲染窗口
-show = True
+show = False
 # -*- coding:utf-8 -*-
 """
 @Author: self-798
@@ -112,6 +112,14 @@ class StreamManager:
         self.mjpeg_server_port = mjpeg_server_port
         self.mjpeg_server_running = False
 
+
+        # 存储的数据
+        # 存储处理线程的信息,用于后端管理线程资源
+        video_thread_info = {}
+        # 记录从rtsp到队列序号的映射
+
+        self.video_thread_info = {}
+        self.video_rtsp_dict= {}
         # 已处理的队列
         self.handle_frame = frame_queue
         # 已处理队列的状态管理,是否可用
@@ -749,7 +757,7 @@ class StreamManager:
                 tracker.setup_video_writer(video_path, suffix=f"_processed_{stream_id}")
 
             # 如果需要显示，创建窗口
-            if show_window:
+            if show_window and show:
                 cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
 
             # 记录帧计数和上次重连时间
@@ -833,8 +841,12 @@ class StreamManager:
                     # 增加帧计数
                     frame_count += 1
 
-                    # 跳帧处理
+                    # 跳帧处理,不过同时也压入队列中
                     if skip_frames > 0 and frame_count % skip_frames != 0:
+                        # 等实现平滑的时候去除掉这一块
+                        #asyncio.run_coroutine_threadsafe(self.handle_frame[queue_index].put(frame),mainloop)
+
+
                         continue
 
                     # 使用跟踪器处理帧
@@ -849,7 +861,7 @@ class StreamManager:
                             print(f"无法将帧放入队列: {e}")
 
                     # 显示处理后的帧
-                    if processed_frame is not None and show_window:
+                    if processed_frame is not None and show_window and show:
                         cv2.imshow(window_name, processed_frame)
 
                         # 按 'q' 键退出单个窗口
@@ -891,7 +903,7 @@ class StreamManager:
                 print(f"释放{window_name}资源时出错: {str(e)}")
 
             # 关闭窗口
-            if show_window:
+            if show_window and show:
                 try:
                     cv2.destroyWindow(window_name)
                 except Exception as e:
@@ -916,13 +928,46 @@ class StreamManager:
         thread = threading.Thread(target=_process_video_task, daemon=True)
         thread.start()
 
-        # 返回包含线程信息的字典
-        return {
+
+        threading_dict={
             "thread": thread,
             "stop_event": stop_event,
             "window_name": window_name,
             "stream_id": stream_id
         }
+        self.video_thread_info[queue_index] =threading_dict
+        self.video_rtsp_dict[video_source]=queue_index
+        # 返回包含线程信息的字典
+        return threading_dict
+    def clear_queue(self, queue_index):
+
+        if queue_index in self.video_thread_info:
+            queue = self.video_thread_info[queue_index]
+            while not queue.empty():
+                try:
+                    # 使用 get_nowait 避免阻塞
+                    queue.get_nowait()
+                    # 需要显式标记任务完成（如果队列是用 task_done 跟踪的）
+                    queue.task_done()
+                except asyncio.QueueEmpty:
+                    break
+
+
+
+    def stop_process_video_in_thread(self,rtsp_url):
+        try:
+            queue_index=self.video_rtsp_dict[rtsp_url]
+            # 停止线程
+            self.video_thread_info[queue_index]['stop_event'].set()
+            # 清除队列
+            self.clear_queue(queue_index)
+        except Exception as e:
+            print('stop error :', str(e))
+        #self.stop_event.set()
+
+        # rtsp_url
+
+
 
     def get_valid_queue_index(self):
         """
@@ -1161,7 +1206,7 @@ class StreamManager:
         # video_id=0
         print("视频流：{}".format(video_id))
         while True:
-            #  print('...1')
+            print('...1')
             frame = await self.handle_frame[video_id].get()
             if show:
                 cv2.imshow('frame', frame)

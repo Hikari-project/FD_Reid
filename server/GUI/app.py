@@ -35,7 +35,7 @@ from libs.rtsp_check import is_img_not_valid
 @asynccontextmanager
 async def lifespan(app:FastAPI):
     # 四个算法处理的生成者队列队列
-    frame_queue=[asyncio.Queue(),asyncio.Queue(),asyncio.Queue(),asyncio.Queue()]
+    frame_queue=[asyncio.Queue(maxsize=5),asyncio.Queue(maxsize=5),asyncio.Queue(maxsize=5),asyncio.Queue(maxsize=5)]
     # 存储处理视频队列
     app.state.frame_queue = frame_queue
     # 存储视频信息
@@ -154,9 +154,12 @@ async def custome_analysis(items: VideoConfig):
 
     video_data=config[0]
 
+    # 清除队列信息
+    app.state.stream_manager.clear_queue(queue_index)
     # 存储处理线程的信息,队列信息
     app.state.video_thread_info[queue_index]=app.state.stream_manager.process_video_in_thread(video_data['rtsp_url'],video_data,queue_index=queue_index)
     app.state.video_rtsp_dict[video_data['rtsp_url']]=queue_index
+
 
     # 处理视频
    # app.state.stream_manager.start_processing(skip_frames=4, match_thresh=0.15, is_track=True)
@@ -167,10 +170,7 @@ class VideoTemp(BaseModel):
 
 @app.post('/customer-flow/stop-analysis')
 def stop_analysis(videoTemp:VideoTemp):
-    queue_index=app.state.video_rtsp_dict[videoTemp.rtsp_url]
-    threading_dict=app.state.video_thread_info[queue_index]
-    print(threading_dict)
-    threading_dict['stop_event'].set()
+    app.state.stream_manager.stop_process_video_in_thread(videoTemp.rtsp_url)
     return {"ret":0,"message":"停止成功"}
 
 

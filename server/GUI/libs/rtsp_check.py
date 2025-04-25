@@ -31,8 +31,8 @@ def is_abnormal_image(image_path):
     # 根据经验设定阈值，这里只是示例，可能需要根据实际情况调整
     #print(mean,std)
     if mean < 10 and std < 20:
-        return True
-    return False
+        return True,mean,std
+    return False,-1,-1
 
 def is_abnormal_image_hist(image_path):
     if isinstance(image_path,str):
@@ -49,10 +49,14 @@ def is_abnormal_image_hist(image_path):
     # 根据经验设定阈值，这里只是示例，可能需要根据实际情况调整
    #print(entropy)
     if entropy < 8:
-        return True
-    return False
+        return True,entropy
+    return False,-1
 def is_img_not_valid(image_path):
-    if is_abnormal_image(image_path) and is_abnormal_image_hist(image_path):
+    ret1,mean,std=is_abnormal_image(image_path)
+    ret2,entropy=is_abnormal_image_hist(image_path)
+    if ret1 and ret2:
+        print(f'case1:mead {mean} std {std}')
+        print(f'case2:entropy {entropy} ')
         return True
     else:
         return False
