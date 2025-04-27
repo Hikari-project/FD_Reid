@@ -35,7 +35,7 @@ from libs.rtsp_check import is_img_not_valid
 @asynccontextmanager
 async def lifespan(app:FastAPI):
     # 四个算法处理的生成者队列队列
-    frame_queue=[asyncio.Queue(maxsize=5),asyncio.Queue(maxsize=5),asyncio.Queue(maxsize=5),asyncio.Queue(maxsize=5)]
+    frame_queue=[asyncio.Queue(maxsize=10),asyncio.Queue(maxsize=10),asyncio.Queue(maxsize=10),asyncio.Queue(maxsize=10)]
     # 存储处理视频队列
     app.state.frame_queue = frame_queue
     # 存储视频信息

@@ -36,22 +36,19 @@ from libs.reid_sqlV2 import init_db, add_feature, update_feature, delete_feature
 from body_quality import BodyCompletenessDetector
 from Algorithm.libs.IDdata.TrackManager import TrackManager, TrackInfo
 from shapely.geometry import Point, LineString, Polygon
-import time
-import argparse
-from dataclasses import dataclass
-from typing import Dict, Optional
+
 from ultralytics import YOLO
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 import os
 import sys
-import cv2
+
 import numpy as np
 import json
 import argparse
-import time
+
 from datetime import datetime
-from typing import Union, List
+
 
 
 # 添加自定义JSON编码器
@@ -148,9 +145,14 @@ class ReIDTracker:
         self.previous_in_roi = set()
         base_feat_lists, base_idx_lists = load_features_from_sqlite(self.db_path, cfgs.DB_NAME, dims=1280)
         print(f'根据数据库中内容，加载行人数量{len(base_feat_lists)}')
-
+        self.start_time = time.time()
         # 初始化ReID Pipeline
         self.reid_pipeline = ReidPipeline(base_feat_lists=base_feat_lists, base_idx_lists=base_idx_lists, dims=1280)
+
+        # fps的队列
+        self.fps_list=[]
+        # 保存渲染行人的队列
+        self.had_search_trackid_list=[[],[],[]]
 
     def _create_track_info(self, track_id: int) -> dict:
         """创建跟踪信息字典"""
@@ -254,6 +256,32 @@ class ReIDTracker:
             #                 color, 2)
 
         return image
+    def draw_text(self,output_frame):
+        # 计算FPS
+        #  self.end_time = time.time()
+        fps_current = 1.0 / (time.time() - self.start_time)
+        self.fps_list.append(fps_current)
+        while len(self.fps_list) > 20:
+            self.fps_list.pop(0)
+        fps = sum(self.fps_list) / len(self.fps_list)
+        self.start_time = time.time()
+
+        # 绘制ROI区域 取消绘制roi
+        self._draw_rois(output_frame, self.json_data)
+
+        # 在处理后的图片上显示信息
+        cv2.putText(output_frame, f'FPS:{fps:.2f}', (30, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+
+        # 显示计数信息
+        counts = self.log_system.get_counts()
+        cv2.putText(output_frame, f"Enter: {counts['enter']}", (30, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        cv2.putText(output_frame, f"Exit: {counts['exit']}", (30, 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        cv2.putText(output_frame, f"Pass: {counts['pass']}", (30, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        cv2.putText(output_frame, f"Re_enter: {counts['re_enter']}", (30, 270), cv2.FONT_HERSHEY_SIMPLEX, 1,
+                    (0, 255, 0), 2)
+        cv2.putText(output_frame, f"Area: {len(self.current_in_roi)}", (30, 210), cv2.FONT_HERSHEY_SIMPLEX, 1,
+                    (0, 255, 0), 2)
+        return output_frame
 
     def setup_processing(self, video_path=None, json_data={}):
         """
@@ -583,7 +611,7 @@ class ReIDTracker:
                     'position': (x_center, y_center),
                     'in_area': curr_in_area
                 })
-
+            self.had_search_trackid_list=had_search_trackid_list
             output_frame = self._draw_match(frame.copy(),
                                             [row[0] for row in had_search_trackid_list],  # boxes
                                             [row[1] for row in had_search_trackid_list],  # labels(id,status)
@@ -592,15 +620,20 @@ class ReIDTracker:
             output_frame = frame.copy()
 
         # 计算FPS
-        end_time = time.time()
-        fps_current = 1.0 / (end_time - start_time)
-        info['fps'] = fps_current
+      #  self.end_time = time.time()
+        fps_current = 1.0 / (time.time() - self.start_time)
+        self.fps_list.append(fps_current)
+        while len(self.fps_list)>20:
+            self.fps_list.pop(0)
+        info['fps'] = sum(self.fps_list)/len(self.fps_list)
+        fps=sum(self.fps_list) / len(self.fps_list)
+        self.start_time=time.time()
 
-        # 绘制ROI区域
+        # 绘制ROI区域 取消绘制roi
         self._draw_rois(output_frame, self.json_data)
 
         # 在处理后的图片上显示信息
-        cv2.putText(output_frame, f'FPS:{fps_current:.2f}', (30, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+        cv2.putText(output_frame, f'FPS:{fps:.2f}', (30, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
 
         # 显示计数信息
         counts = self.log_system.get_counts()
@@ -611,6 +644,7 @@ class ReIDTracker:
                     (0, 255, 0), 2)
         cv2.putText(output_frame, f"Area: {len(self.current_in_roi)}", (30, 210), cv2.FONT_HERSHEY_SIMPLEX, 1,
                     (0, 255, 0), 2)
+
 
         # 保存视频
         if hasattr(self, 'video_writer') and self.video_writer is not None:
