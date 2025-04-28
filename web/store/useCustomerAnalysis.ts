@@ -10,7 +10,9 @@ import type {
 } from '@/store/types';
 
 //export const backendUrl = process.env.VITE_BACKEND_URL;
-export const backendUrl = 'http://127.0.0.1:3009'
+export const backendUrl = 'http://47.97.71.139:3008'
+export const sourceUrl = 'http://127.0.0.1:3007'
+
 
 async function fetchFirstFrameFromBackend(
   rtspUrl: string
@@ -155,10 +157,10 @@ export const useAppStore = create<AppState & AppActions>()(
           if (status === 'success') {
             get().setSourceFrame(
               url, 
-              `${backendUrl}${frame_url}`, 
+              `${frame_url}`,
               {width: size.width, height: size.height}, 
               undefined, 
-              `${backendUrl}${mjpeg_stream}`
+              `${mjpeg_stream}`
             );
           } else {
             get().setSourceFrame(url, null, undefined, 'Failed to fetch first frame');
@@ -372,7 +374,7 @@ export const useAppStore = create<AppState & AppActions>()(
 
           const mjpegUrl = analysisResponse.res[0].mjpeg_url;
 
-          get().setMjpegStream(url, `${backendUrl}${mjpegUrl}`);
+          get().setMjpegStream(url, `${mjpegUrl}`);
         } catch (error: any) {
           console.error(`Error starting analysis for ${url}:`, error);
           get().setMjpegStream(url, null, error.message || 'Failed to start analysis');

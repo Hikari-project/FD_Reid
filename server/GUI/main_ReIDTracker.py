@@ -56,7 +56,7 @@ from libs.rtsp_check import is_img_not_validV2
 # 获取主事件循环
 mainloop = asyncio.get_event_loop()
 asyncio.set_event_loop(mainloop)
-
+source_url='http://127.0.0.1:3007'
 
 # 添加自定义JSON编码器
 class NumpyEncoder(json.JSONEncoder):
@@ -245,7 +245,7 @@ class StreamManager:
             # 添加到返回列表
             mjpeg_list.append({
                 "source_url": url,
-                "mjpeg_url": f"/customer-flow/video_feed?video_id={queue_index}",
+                "mjpeg_url": f"{source_url}/customer-flow/video_feed?video_id={queue_index}",
                 "is_rtsp": is_rtsp,
                 "stream_index": queue_index
             })

@@ -32,6 +32,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 # 自定义的库
 from libs.rtsp_check import is_img_not_valid
+
+backend='http://127.0.0.1:3007'
 @asynccontextmanager
 async def lifespan(app:FastAPI):
     # 四个算法处理的生成者队列队列
@@ -251,9 +253,9 @@ async def check_rtsp(rtsp: RTSP):
 
     videodata={
         "cap":cap,
-        "frame_url": f"/static/frames/{frame_id}.jpg",
+        "frame_url": f"{backend}/static/frames/{frame_id}.jpg",
         "size":{"height":h,"width":w},
-        "mjpeg_stream": f"/customer-flow/video-stream/{stream_id}",
+        "mjpeg_stream": f"{backend}/customer-flow/video-stream/{stream_id}",
         "last_used":time.time()
     }
 
@@ -261,9 +263,9 @@ async def check_rtsp(rtsp: RTSP):
     return {
         "status": "success",
         "frame_id":frame_id,
-        "frame_url": f"/static/frames/{frame_id}.jpg",
+        "frame_url": f"{backend}/static/frames/{frame_id}.jpg",
         "size":{"height":h,"width":w},
-        "mjpeg_stream": f"/customer-flow/video-stream/{stream_id}"
+        "mjpeg_stream": f"{backend}/customer-flow/video-stream/{stream_id}"
     }
 
 
@@ -297,6 +299,15 @@ async def video_stream(stream_id: str):
         media_type="multipart/x-mixed-replace;boundary=frame"
     )
 
+import tracemalloc
+
+tracemalloc.start(10)  # 记录前10个内存分配点
+
+@app.get("/memory_snapshot")
+async def get_memory_snapshot():
+    snapshot = tracemalloc.take_snapshot()
+    top_stats = snapshot.statistics('lineno')
+    return {"memory_stats": [str(stat) for stat in top_stats[:5]]}
 
 if __name__ == "__main__":
 
@@ -309,7 +320,7 @@ if __name__ == "__main__":
     config = uvicorn.Config('app:app',
                          #   host="0.0.0.0",
                             host="127.0.0.1",
-                            port=3009,
+                            port=3007,
                             http="h11",
                             timeout_keep_alive=30,
                             limit_concurrency=40)
