@@ -298,6 +298,18 @@ async def video_stream(stream_id: str):
     )
 
 
+import tracemalloc
+
+tracemalloc.start(10)  # 记录前10个内存分配点
+
+@app.get("/memory_snapshot")
+async def get_memory_snapshot():
+    snapshot = tracemalloc.take_snapshot()
+    top_stats = snapshot.statistics('lineno')
+    return {"memory_stats": [str(stat) for stat in top_stats[:5]]}
+
+
+
 if __name__ == "__main__":
 
     import uvicorn
@@ -309,7 +321,7 @@ if __name__ == "__main__":
     config = uvicorn.Config('app:app',
                          #   host="0.0.0.0",
                             host="127.0.0.1",
-                            port=3009,
+                            port=3002,
                             http="h11",
                             timeout_keep_alive=30,
                             limit_concurrency=40)

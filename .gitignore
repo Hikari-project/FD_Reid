@@ -10,6 +10,8 @@
 
 # 忽略运行数据
 *.db
+# 忽視日誌文件
+*.log
 
 /server/GUI/logs/
 /server/GUI/outputs/

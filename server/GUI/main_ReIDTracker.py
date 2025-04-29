@@ -31,7 +31,15 @@ from typing import List, Dict, Any, Optional, Union
 import time
 import cv2
 import asyncio
+class FixedSizeAsyncQueue(asyncio.Queue):
+    def __init__(self, maxsize=5):
+        super().__init__(maxsize)
 
+    async def put(self, item):
+        if self.full():
+            # 队列已满时，先丢弃最旧元素
+            _ = await self.get()
+        await super().put(item)
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 # 是否渲染窗口
 show = False
@@ -376,7 +384,7 @@ class StreamManager:
                 if is_rtsp:
                     print(f"配置RTSP流 {video_source}")
                     # 设置环境变量以使用TCP传输协议
-                    os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|stimeout;5000000"
+                  #  os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|stimeout;5000000"
                     cap = cv2.VideoCapture(video_source, cv2.CAP_FFMPEG)
                     cap.set(cv2.CAP_PROP_BUFFERSIZE, 3)  # 设置缓冲区大小
                     #cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('H', '2', '6', '4'))  # 使用H264解码器
@@ -458,6 +466,7 @@ class StreamManager:
                                 # 创建新的捕获对象
                                 os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|stimeout;5000000"
                                 new_cap = cv2.VideoCapture(video_path, cv2.CAP_FFMPEG)
+                                cap.set(cv2.CAP_PROP_BUFFERSIZE, 3)  # 设置缓冲区大小
                                 if new_cap.isOpened():
                                     # 对RTSP流进行特殊配置
                                     new_cap.set(cv2.CAP_PROP_BUFFERSIZE, 3)
@@ -641,7 +650,7 @@ class StreamManager:
         print(self.handle_queue_status.items())
         for key, value in self.handle_queue_status.items():
             if value:
-                self.handle_frame[key] = asyncio.Queue(maxsize=10)  # 清空这个队列
+                self.handle_frame[key] = FixedSizeAsyncQueue(maxsize=10)  # 清空这个队列
                 self.handle_queue_status[key] = False  # 这个队列已使用
                 return key
 

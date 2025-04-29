@@ -10,7 +10,7 @@ import type {
 } from '@/store/types';
 
 //export const backendUrl = process.env.VITE_BACKEND_URL;
-export const backendUrl = 'http://127.0.0.1:3009'
+export const backendUrl = 'http://127.0.0.1:3002'
 
 async function fetchFirstFrameFromBackend(
   rtspUrl: string
