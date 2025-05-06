@@ -139,7 +139,7 @@ class IDDict:
         # 修改计数逻辑，移除只记录一次的限制
         should_count = True
         # 过店逻辑仍然保留，因为过店需要完整经过passarea
-        if count type =='pass' and not entry.get('pass_counted'):
+        if count_type =='pass' and not entry.get('pass_counted'):
             entry['pass_counted'] = True
             entry['in_pass'] = False  # 重置过店标记      
         if should_count:
