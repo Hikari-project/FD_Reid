@@ -112,7 +112,7 @@ class IDDict:
     def _handle_state_change(self, entry, old_state, new_state):
         """
         处理状态变化事件:
-        - 进出店: 使用is_counted标记
+        - 进出店: 不再限制只记录第一次 # 使用is_counted标记
         - 过店: 需要完整经过pass_area区域,使用pass_counted标记
         """
         # 添加过店中间状态判断
@@ -136,18 +136,12 @@ class IDDict:
             
         event_type, count_type = event_info
         
-        # 根据事件类型选择计数标记
-        should_count = False
-        if count_type == 'store' and not entry.get('is_counted'):
-            entry['is_counted'] = True
-            should_count = True
-            entry['in_pass'] = False
-        elif count_type == 'pass' and not entry.get('pass_counted'):
+        # 修改计数逻辑，移除只记录一次的限制
+        should_count = True
+        # 过店逻辑仍然保留，因为过店需要完整经过passarea
+        if count type =='pass' and not entry.get('pass_counted'):
             entry['pass_counted'] = True
-            entry['in_pass'] = False  # 重置过店标记
-            should_count = True
-        if event_type == 'enter':
-            should_count = True
+            entry['in_pass'] = False  # 重置过店标记      
         if should_count:
             return {
                 'type': event_type,
