@@ -556,8 +556,8 @@ class ReIDTracker:
         if is_track and track_ids is not None and len(track_ids) > 0:
             for bbox, track_id, conf in zip(boxes, track_ids, confs):
                 # 质量检测
-                if bbox[3] - bbox[1] < 50 or bbox[2] - bbox[0] < 50 or conf < 0.5:
-                    continue
+                # if bbox[3] - bbox[1] < 50 or bbox[2] - bbox[0] < 50 or conf < 0.5:
+                #    continue
 
                 # 获取ROI
                 x1, y1, x2, y2 = map(int, bbox)
