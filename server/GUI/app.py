@@ -278,7 +278,7 @@ if __name__ == "__main__":
     config = uvicorn.Config('app:app',
                          #   host="0.0.0.0",
                             host="127.0.0.1",# 127.0.0.1
-                            port=3009,
+                            port=3002,
                             http="h11",
                             timeout_keep_alive=30,
                             limit_concurrency=40)
