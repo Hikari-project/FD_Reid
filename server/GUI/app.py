@@ -30,23 +30,15 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-# 自定义的库
-from libs.rtsp_check import is_img_not_valid
+
 @asynccontextmanager
 async def lifespan(app:FastAPI):
     # 四个算法处理的生成者队列队列
-    frame_queue=[asyncio.Queue(maxsize=10),asyncio.Queue(maxsize=10),asyncio.Queue(maxsize=10),asyncio.Queue(maxsize=10)]
-    # 存储处理视频队列
+    frame_queue=[asyncio.Queue(),asyncio.Queue(),asyncio.Queue(),asyncio.Queue()]
     app.state.frame_queue = frame_queue
-    # 存储视频信息
-    app.state.videos_data={}
-    # 存储处理线程的信息,用于后端管理线程资源
-    app.state.video_thread_info={}
-    # 记录从rtsp到队列序号的映射
-    app.state.video_rtsp_dict= {}
-
     app.state.stream_manager = StreamManager(mjpeg_server_port=8554, max_reconnect=10,frame_queue=frame_queue)
     # app.state.stream_manager.custumer_analysis()
+
 
     yield
     # 清理资源
@@ -96,7 +88,7 @@ from typing import Annotated
 class VideoData(BaseModel):
     """视频分析基础数据模型"""
     rtsp_url: str = Field(
-        example="rtsp://localhost:5555/live",
+        example="rtsp://localhost:8554/live", # 5555
         description="RTSP视频流地址"
     )
 
@@ -123,6 +115,7 @@ async def setting(items:VideoConfig):
     config_list=items.dict()
     print(config_list)
     mjpeg_list = app.state.stream_manager.setup_streams(config_list, show_windows=True)
+
     return {"ret":0,"message":str(mjpeg_list)}
 
 
@@ -132,6 +125,7 @@ async def custome_analysis(items: VideoConfig):
     print("videoData:",str(VideoConfig))
     config=VideoConfig['videos']
     # 设置视频值
+
     mjpeg_list = app.state.stream_manager.setup_streams(config, show_windows=True)
     print(mjpeg_list)
     # 处理视频
@@ -139,53 +133,53 @@ async def custome_analysis(items: VideoConfig):
     app.state.stream_manager.start_processing(skip_frames=4, match_thresh=0.15, is_track=True)
     return {"ret": 0, "message": '已开启',"res":mjpeg_list}
 
-@app.post('/customer-flow/custome-analysisV2')
-async def custome_analysis(items: VideoConfig):
-    VideoConfig=items.dict()
-    print("videoData:",str(VideoConfig))
-    config=VideoConfig['videos']
-
-    # 设置视频值
-    queue_index = app.state.stream_manager.get_valid_queue_index()
-    print(f'获取到可用队列：{queue_index}')
-
-    mjpeg_list = app.state.stream_manager.setup_streams(config,queue_index, show_windows=True)
-    print(mjpeg_list)
-
-    video_data=config[0]
-
-    # 清除队列信息
-    app.state.stream_manager.clear_queue(queue_index)
-    # 存储处理线程的信息,队列信息
-    app.state.video_thread_info[queue_index]=app.state.stream_manager.process_video_in_thread(video_data['rtsp_url'],video_data,queue_index=queue_index)
-    app.state.video_rtsp_dict[video_data['rtsp_url']]=queue_index
-
-
-    # 处理视频
-   # app.state.stream_manager.start_processing(skip_frames=4, match_thresh=0.15, is_track=True)
-    return {"ret": 0, "message": '已开启',"res":mjpeg_list}
-
-class VideoTemp(BaseModel):
-    rtsp_url: str = Field()
-
-@app.post('/customer-flow/stop-analysis')
-def stop_analysis(videoTemp:VideoTemp):
-    app.state.stream_manager.stop_process_video_in_thread(videoTemp.rtsp_url)
-    return {"ret":0,"message":"停止成功"}
-
-
-
 def generate_mjpeg(rtsp_url):
-    cap = cv2.VideoCapture(rtsp_url)
+    # 使用FFMPEG解码器打开RTSP流
+    cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 5)  # 设置缓冲区大小
+    
+    # 连接重试
+    max_retries = 5
+    retry_count = 0
+    retry_delay = 2  # 秒
+    
+    while not cap.isOpened() and retry_count < max_retries:
+        print(f"无法打开视频流，正在重试... ({retry_count+1}/{max_retries})")
+        time.sleep(retry_delay)
+        cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, 5)
+        retry_count += 1
+    
+    if not cap.isOpened():
+        print(f"无法打开视频流: {rtsp_url}")
+        return
+        
     while True:
         ret, frame = cap.read()
         if not ret:
-            break
-        ret, jpeg = cv2.imencode('.jpg', frame)
+            print("视频流读取错误，尝试重新连接...")
+            cap.release()
+            cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 5)
+            
+            # 如果重连失败，等待一会再试
+            if not cap.isOpened():
+                time.sleep(1)
+                continue
+                
+            # 尝试再次读取帧
+            ret, frame = cap.read()
+            if not ret:
+                continue
+                
+        # 压缩图像质量以提高传输效率
+        encode_params = [cv2.IMWRITE_JPEG_QUALITY, 85]  # 85%的质量
+        ret, jpeg = cv2.imencode('.jpg', frame, encode_params)
+        
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n\r\n')
+    
     cap.release()
-
 
 from pydantic import BaseModel
 class RTSP(BaseModel):
@@ -195,46 +189,48 @@ class RTSP(BaseModel):
 @app.post("/customer-flow/check-rtsp")
 async def check_rtsp(rtsp: RTSP):
     # 尝试打开RTSP流
-    rtsp_url=rtsp.rtsp_url
-    cap = cv2.VideoCapture(rtsp_url)
+    rtsp_url = rtsp.rtsp_url
+    
+    # 使用FFMPEG解码器
+    cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 5)  # 设置缓冲区大小
+    
+    # 连接重试
+    max_retries = 5
+    retry_count = 0
+    retry_delay = 1  # 秒
+    
+    while not cap.isOpened() and retry_count < max_retries:
+        print(f"无法打开视频流，正在重试... ({retry_count+1}/{max_retries})")
+        await asyncio.sleep(retry_delay)
+        cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, 5)
+        retry_count += 1
+        
     if not cap.isOpened():
-        raise HTTPException(status_code=400, detail="无法打开RTSP流")
+        raise HTTPException(status_code=400, detail="无法打开RTSP流，请检查地址和网络连接")
 
-   # cap.set(cv2.CAP_PROP_BUFFERSIZE,2)
-
-    # 增加重连次数和超时处理
-
-    valid_frame =None
-    # for i in range(20):
-    #     ret,valid_frame=cap.read()
-
-    # 捕获首帧
-    max_attempts=100
-    for i in range(max_attempts):
+    # 捕获首帧，最多尝试30次
+    frame = None
+    for i in range(30):
         ret, frame = cap.read()
-        if ret and frame is not None and frame.size != 0:
-            if is_img_not_valid(frame):
-                continue
-            else:
-                print('发现未损坏图片',str(i))
-                valid_frame=frame
-                break
-        cv2.waitKey(1)
-
-
-    if not ret or valid_frame is None:
+        if ret:
+            break
+        await asyncio.sleep(0.1)
+            
+    if frame is None:
         cap.release()
-        raise HTTPException(status_code=400, detail="无法读取视频帧")
-
-    h,w=valid_frame.shape[:2]
-    print("宽高")
-    print(w,h)
+        raise HTTPException(status_code=400, detail="无法读取视频帧，请检查视频源")
+        
+    h, w = frame.shape[:2]
+    print("视频分辨率:", w, h)
+    
     # 保存首帧图片
     os.makedirs("static/frames", exist_ok=True)
     frame_id = str(uuid.uuid4())
     frame_path = f"static/frames/{frame_id}.jpg"
-    cv2.imwrite(frame_path, valid_frame)
-
+    cv2.imwrite(frame_path, frame)
+    cap.release()
 
     # 创建MJPEG推流
     stream_id = str(uuid.uuid4())
@@ -242,72 +238,33 @@ async def check_rtsp(rtsp: RTSP):
         'rtsp_url': rtsp_url,
         'active': True
     }
-
     # 启动推流线程
     threading.Thread(target=lambda: StreamingResponse(
         generate_mjpeg(rtsp_url),
         media_type="multipart/x-mixed-replace;boundary=frame"
     )).start()
 
-    videodata={
-        "cap":cap,
-        "frame_url": f"/static/frames/{frame_id}.jpg",
-        "size":{"height":h,"width":w},
-        "mjpeg_stream": f"/customer-flow/video-stream/{stream_id}",
-        "last_used":time.time()
-    }
-
-    app.state.videos_data[frame_id]=videodata
     return {
         "status": "success",
-        "frame_id":frame_id,
         "frame_url": f"/static/frames/{frame_id}.jpg",
         "size":{"height":h,"width":w},
         "mjpeg_stream": f"/customer-flow/video-stream/{stream_id}"
     }
 
 
-
-@app.get("/customer-flow/get-cap")
-async def get_latest_frame(frame_id: str):
-    video_data = app.state.videos_data.get(frame_id)
-    if not video_data:
-        raise HTTPException(status_code=404, detail="无效的frame_id")
-
-    # 更新最后使用时间
-    video_data['last_used'] = time.time()
-
-    # 读取最新帧
-    cap = video_data['cap']
-    while True:  # 跳过部分帧
-        for i in range(5):
-            ret, frame = cap.read()
-            print(ret)
-            if ret:break
-        if not ret :break
-        cv2.imshow('frame', frame)
-        cv2.waitKey(1)
-
 @app.get("/customer-flow/video-stream/{stream_id}")
 async def video_stream(stream_id: str):
     if stream_id not in stream_objects:
         raise HTTPException(status_code=404, detail="推流不存在")
+    
+    # 检查流是否仍然活跃
+    if not stream_objects[stream_id].get('active', False):
+        raise HTTPException(status_code=410, detail="推流已关闭")
+        
     return StreamingResponse(
         generate_mjpeg(stream_objects[stream_id]['rtsp_url']),
         media_type="multipart/x-mixed-replace;boundary=frame"
     )
-
-
-import tracemalloc
-
-tracemalloc.start(10)  # 记录前10个内存分配点
-
-@app.get("/memory_snapshot")
-async def get_memory_snapshot():
-    snapshot = tracemalloc.take_snapshot()
-    top_stats = snapshot.statistics('lineno')
-    return {"memory_stats": [str(stat) for stat in top_stats[:5]]}
-
 
 
 if __name__ == "__main__":
@@ -320,8 +277,8 @@ if __name__ == "__main__":
 
     config = uvicorn.Config('app:app',
                          #   host="0.0.0.0",
-                            host="127.0.0.1",
-                            port=3002,
+                            host="127.0.0.1",# 127.0.0.1
+                            port=3009,
                             http="h11",
                             timeout_keep_alive=30,
                             limit_concurrency=40)
