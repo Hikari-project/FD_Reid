@@ -527,7 +527,7 @@ class ReIDTracker:
             tracker=cfgs.YOLO_TRACKER_TYPE,
             conf=0.2,
             iou=0.4,
-            classes=self.reid_pipeline._target_class_idx_list
+            # classes=self.reid_pipeline._target_class_idx_list
         )
 
         # Extract detection data from results
