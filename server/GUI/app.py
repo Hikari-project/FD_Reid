@@ -243,6 +243,8 @@ async def check_rtsp(rtsp: RTSP):
         'active': True
     }
 
+    app.state.stream_manager.rtsp_2_frames(rtsp_url)
+
     # 启动推流线程
     threading.Thread(target=lambda: StreamingResponse(
         generate_mjpeg(rtsp_url),

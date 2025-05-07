@@ -135,6 +135,8 @@ class StreamManager:
             3: True,
         }
 
+        self.origin_frame_queue=[queue.Queue(maxsize=10)]
+
     def load_model(self):
         pass
 
@@ -321,8 +323,26 @@ class StreamManager:
                         self.streams[index].is_rtsp)
             return False
 
-
-
+    def rtsp_2_frames(self, rtsp_url):
+        def _rtsp_2_frames(rtsp_url):
+            cap = cv2.VideoCapture(rtsp_url)
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if ret:
+                    try:
+                        print(self.origin_frame_queue[0].qsize())
+                        # cv2.imshow('frame2', frame)
+                        # cv2.waitKey(1)
+                        self.origin_frame_queue[0].put(frame, block=False)
+                    except queue.Full:
+                        _= self.origin_frame_queue[0].get()
+                        pass  # 忽略队列满的情况
+                else:
+                    print("RTSP读取失败，尝试重连...")
+                    break
+            cap.release()
+        thread=threading.Thread(target=_rtsp_2_frames, args=(rtsp_url,))
+        thread.start()
 
     def process_video_in_thread(self, video_source, temp_data={},
                                 skip_frames=2, match_thresh=0.15, is_track=True, save_video=False,
@@ -349,7 +369,7 @@ class StreamManager:
         import cv2
         import time
         import os
-
+        print("process_video_in_thread")
         # 创建停止事件
         stop_event = threading.Event()
 
@@ -362,7 +382,7 @@ class StreamManager:
         else:
             stream_id = window_name.split()[-1] if window_name.split()[-1].isdigit() else 0
 
-        def _process_video_task():
+        async  def _process_video_task():
             """线程内运行的任务函数"""
             # 创建日志系统
             log_system = LogSystem()
@@ -433,72 +453,8 @@ class StreamManager:
             while not stop_event.is_set():
                 try:
                     # 尝试读取帧
-                    ret, frame = cap.read()
+                    frame = self.origin_frame_queue[0].get()
 
-                    # 处理读取失败的情况，可能是视频结束或RTSP断开
-                    max_attempt = 10
-                    if not ret:
-                        for i in range(max_attempt):
-                            ret, frame = cap.read()
-                            if ret:
-                                break
-                    # frame = np.ascontiguousarray(frame)
-                    # frame=cv2.resize(frame, (1920, 1080))
-                    # 连续10次失败可能就是rtsp断开，那就重新连接
-                    if not ret:
-                        current_time = time.time()
-                        # 对于RTSP流，尝试重连
-                        if is_rtsp and video_path:
-                            # 更新重连计数
-                            if stream_manager:
-                                stream_manager.update_stream_status(stream_id, True, reconnect_increment=True)
-
-                            # 检查是否应该继续重连
-                            should_reconnect = True
-                            if stream_manager:
-                                should_reconnect = stream_manager.should_reconnect(stream_id)
-
-                            if should_reconnect and current_time - last_reconnect_time > reconnect_interval:
-                                print(f"{window_name}连接断开，尝试重新连接...")
-                                cap.release()
-                                time.sleep(1)  # 等待1秒后尝试重新连接
-
-                                # 创建新的捕获对象
-                                os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|stimeout;5000000"
-                                new_cap = cv2.VideoCapture(video_path, cv2.CAP_FFMPEG)
-                                cap.set(cv2.CAP_PROP_BUFFERSIZE, 3)  # 设置缓冲区大小
-                                if new_cap.isOpened():
-                                    # 对RTSP流进行特殊配置
-                                    new_cap.set(cv2.CAP_PROP_BUFFERSIZE, 3)
-                                    new_cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('H', '2', '6', '4'))
-                                    try:
-                                        new_cap.set(cv2.CAP_PROP_TIMEOUT, 10000)  # 设置超时时间(毫秒)
-                                    except:
-                                        pass
-
-                                    # 更新捕获对象
-                                    cap = new_cap
-                                    last_reconnect_time = current_time
-                                    print(f"{window_name}重新连接成功")
-
-                                    # 尝试读取一帧
-                                    ret, frame = cap.read()
-                                    if not ret:
-                                        print(f"{window_name}重新连接后无法读取帧")
-                                        continue
-                                else:
-                                    print(f"{window_name}重新连接失败")
-                                    last_reconnect_time = current_time
-                                    continue
-                            else:
-                                # 未达到重连间隔或超过最大重连次数，跳过本次处理
-                                continue
-                        else:
-                            # 非RTSP流，视频可能已结束
-                            print(f"{window_name}读取完毕或出错。")
-                            if stream_manager:
-                                stream_manager.update_stream_status(stream_id, False)
-                            break
 
                     # 增加帧计数
                     frame_count += 1
@@ -517,15 +473,13 @@ class StreamManager:
 
                         asyncio.run_coroutine_threadsafe(self.handle_frame[queue_index].put(frame),mainloop)
 
-
                         continue
                     # 如果拉流是坏的就不推理
                     # if  is_img_not_validV2(frame):
                     #    continue
-
                     # 使用跟踪器处理帧
-                    processed_frame, info = tracker.process_frame(frame, 0, match_thresh, is_track)
-                    cv2.waitKey(1)
+                    processed_frame, info = await tracker.process_frame(frame, 0, match_thresh, is_track)
+
                     # 将处理后的帧放入队列
                     if processed_frame is not None:
                         try:
@@ -534,38 +488,18 @@ class StreamManager:
                         except Exception as e:
                             print(f"无法将帧放入队列: {e}")
 
-                    # 显示处理后的帧
-                    if processed_frame is not None and show_window and show:
-                        cv2.imshow(window_name, processed_frame)
+                    #processed_frame=frame
+                    # cv2.imshow("processed_frame", processed_frame)
+                    #
+                    # cv2.imshow("frame4", frame)
+                    # cv2.waitKey(1)
 
-                        # 按 'q' 键退出单个窗口
-                        key = cv2.waitKey(1) & 0xFF
-                        if key == ord('q'):
-                            break
 
                 except Exception as e:
                     print(f"处理{window_name}时出错: {str(e)}")
                     import traceback
                     traceback.print_exc()
 
-                    # 对于RTSP流错误处理
-                    if is_rtsp and video_path:
-                        if stream_manager:
-                            stream_manager.update_stream_status(stream_id, True, reconnect_increment=True)
-
-                        # 检查是否应该继续重连
-                        should_reconnect = True
-                        if stream_manager:
-                            should_reconnect = stream_manager.should_reconnect(stream_id)
-
-                        if not should_reconnect:
-                            if stream_manager:
-                                stream_manager.update_stream_status(stream_id, False)
-                            break
-                    else:
-                        if stream_manager:
-                            stream_manager.update_stream_status(stream_id, False)
-                        break
 
             # 释放资源
             if cap is not None:
@@ -598,10 +532,18 @@ class StreamManager:
             except Exception as e:
                 print(f"无法获取{window_name}的统计结果: {e}")
 
-        # 创建并启动线程
-        thread = threading.Thread(target=_process_video_task, daemon=True)
-        thread.start()
+        def _thread_target():
+            """线程入口：创建新事件循环"""
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                loop.run_until_complete(_process_video_task())
+            finally:
+                loop.close()
 
+        # 创建并启动线程
+        thread = threading.Thread(target=_thread_target, daemon=True)
+        thread.start()
 
         threading_dict={
             "thread": thread,

@@ -7,7 +7,7 @@
 @Describe:
 加入log系统，加入数据库，重构为类结构，改进进出店检测逻辑
 """
-
+import asyncio
 from datetime import datetime
 import re
 import gc
@@ -461,7 +461,7 @@ class ReIDTracker:
         )
         print("搜索引擎已重新加载")
 
-    def process_frame(self, frame=None, skip_frames=2, match_thresh=0.15, is_track=True):
+    async def process_frame(self, frame=None, skip_frames=2, match_thresh=0.15, is_track=True):
         """
         处理单帧图像
 
@@ -521,13 +521,25 @@ class ReIDTracker:
         #     format='video',
         #     is_track=is_track
         # )
-        results = self.model.track(
-            frame,
-            persist=True,
-            tracker=cfgs.YOLO_TRACKER_TYPE,
-            conf=0.2,
-            iou=0.4,
-            # classes=self.reid_pipeline._target_class_idx_list
+        # results = self.model.track(
+        #     frame,
+        #     persist=True,
+        #     tracker=cfgs.YOLO_TRACKER_TYPE,
+        #     conf=0.2,
+        #     iou=0.4,
+        #     # classes=self.reid_pipeline._target_class_idx_list
+        # )
+        # 异步执行YOLO目标检测
+        loop = asyncio.get_running_loop()
+        results = await loop.run_in_executor(
+            None,
+            lambda: self.model.track(
+                frame,
+                persist=True,
+                tracker=cfgs.YOLO_TRACKER_TYPE,
+                conf=0.2,
+                iou=0.4
+            )
         )
 
         # Extract detection data from results
