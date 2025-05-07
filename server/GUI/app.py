@@ -158,6 +158,7 @@ async def custome_analysis(items: VideoConfig):
     app.state.stream_manager.clear_queue(queue_index)
     # 存储处理线程的信息,队列信息
     app.state.video_thread_info[queue_index]=app.state.stream_manager.process_video_in_thread(video_data['rtsp_url'],video_data,queue_index=queue_index)
+
     app.state.video_rtsp_dict[video_data['rtsp_url']]=queue_index
 
 
@@ -234,7 +235,6 @@ async def check_rtsp(rtsp: RTSP):
     frame_id = str(uuid.uuid4())
     frame_path = f"static/frames/{frame_id}.jpg"
     cv2.imwrite(frame_path, valid_frame)
-
 
     # 创建MJPEG推流
     stream_id = str(uuid.uuid4())

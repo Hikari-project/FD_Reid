@@ -135,7 +135,16 @@ class StreamManager:
             3: True,
         }
 
-        self.origin_frame_queue=[queue.Queue(maxsize=10)]
+        self.origin_frame_queue=[queue.Queue(maxsize=10),queue.Queue(maxsize=10),queue.Queue(maxsize=10),queue.Queue(maxsize=10)]
+        # 已处理队列的状态管理,是否可用
+        self.origin_frame_queue_status = {
+            0: True,
+            1: True,
+            2: True,
+            3: True,
+        }
+        self.origin_video_rtsp_dict = {}
+
 
     def load_model(self):
         pass
@@ -190,6 +199,7 @@ class StreamManager:
             url = config["rtsp_url"]
 
             # 检查是否为RTSP流或视频文件
+
             is_rtsp = self.is_rtsp_url(url)
             is_video = self.is_video_file(url) if not is_rtsp else False
 
@@ -326,6 +336,8 @@ class StreamManager:
     def rtsp_2_frames(self, rtsp_url):
         def _rtsp_2_frames(rtsp_url):
             cap = cv2.VideoCapture(rtsp_url)
+            index=self.get_valid_origin_queue_index()
+            self.origin_video_rtsp_dict[rtsp_url] = index
             while cap.isOpened():
                 ret, frame = cap.read()
                 if ret:
@@ -333,16 +345,21 @@ class StreamManager:
                         print(self.origin_frame_queue[0].qsize())
                         # cv2.imshow('frame2', frame)
                         # cv2.waitKey(1)
-                        self.origin_frame_queue[0].put(frame, block=False)
+
+                        self.origin_frame_queue[index].put(frame, block=False)
                     except queue.Full:
-                        _= self.origin_frame_queue[0].get()
+                        _= self.origin_frame_queue[index].get()
                         pass  # 忽略队列满的情况
+
+
                 else:
                     print("RTSP读取失败，尝试重连...")
                     break
             cap.release()
+
         thread=threading.Thread(target=_rtsp_2_frames, args=(rtsp_url,))
         thread.start()
+
 
     def process_video_in_thread(self, video_source, temp_data={},
                                 skip_frames=2, match_thresh=0.15, is_track=True, save_video=False,
@@ -382,7 +399,7 @@ class StreamManager:
         else:
             stream_id = window_name.split()[-1] if window_name.split()[-1].isdigit() else 0
 
-        async  def _process_video_task():
+        async def _process_video_task():
             """线程内运行的任务函数"""
             # 创建日志系统
             log_system = LogSystem()
@@ -450,33 +467,19 @@ class StreamManager:
                 stream_manager.update_stream_status(stream_id, True)
 
             # 主循环
+            index=self.origin_video_rtsp_dict[video_source]
+
             while not stop_event.is_set():
                 try:
                     # 尝试读取帧
-                    frame = self.origin_frame_queue[0].get()
 
+                    frame = self.origin_frame_queue[index].get()
+                    # ret,frame=cap.read()
 
                     # 增加帧计数
                     frame_count += 1
 
-                    # 跳帧处理,不过同时也压入队列中
-                    if skip_frames > 0 and frame_count % skip_frames != 0:
-                        # 等实现平滑的时候去除掉这一块
-                        try:
-                            output_frame=tracker._draw_match(frame,
-                                             [row[0] for row in tracker.had_search_trackid_list],  # boxes
-                                             [row[1] for row in tracker.had_search_trackid_list],  # labels(id,status)
-                                             [row[2] for row in tracker.had_search_trackid_list])  # confs
-                            frame = tracker.draw_text(output_frame)
-                        except Exception as e:
-                            pass
 
-                        asyncio.run_coroutine_threadsafe(self.handle_frame[queue_index].put(frame),mainloop)
-
-                        continue
-                    # 如果拉流是坏的就不推理
-                    # if  is_img_not_validV2(frame):
-                    #    continue
                     # 使用跟踪器处理帧
                     processed_frame, info = await tracker.process_frame(frame, 0, match_thresh, is_track)
 
@@ -569,15 +572,28 @@ class StreamManager:
                 except asyncio.QueueEmpty:
                     break
 
+    def get_valid_origin_queue_index(self):
+        """
+        查询目前哪个队列可以用
+        :return:
+        """
+        print(self.origin_frame_queue_status.items())
+        for key, value in self.origin_frame_queue_status.items():
+            if value:
+                self.origin_frame_queue[key] = queue.Queue(maxsize=10) # 清空这个队列
+                self.origin_frame_queue_status[key] = False  # 这个队列已使用
+                return key
 
 
     def stop_process_video_in_thread(self,rtsp_url):
         try:
             queue_index=self.video_rtsp_dict[rtsp_url]
+
             # 停止线程
             self.video_thread_info[queue_index]['stop_event'].set()
             # 清除队列
             self.clear_queue(queue_index)
+
         except Exception as e:
             print('stop error :', str(e))
         #self.stop_event.set()
