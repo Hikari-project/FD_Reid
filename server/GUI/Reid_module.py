@@ -526,10 +526,10 @@ class ReIDTracker:
             persist=True,
             tracker=cfgs.YOLO_TRACKER_TYPE,
             conf=0.2,
-            iou=0.4,
-            classes=self.reid_pipeline._target_class_idx_list
+            iou=0.4
+           # classes=self.reid_pipeline._target_class_idx_list
         )
-
+       # print(results)
         # Extract detection data from results
         boxes = []
         track_ids = []
@@ -556,8 +556,8 @@ class ReIDTracker:
         if is_track and track_ids is not None and len(track_ids) > 0:
             for bbox, track_id, conf in zip(boxes, track_ids, confs):
                 # 质量检测
-                if bbox[3] - bbox[1] < 50 or bbox[2] - bbox[0] < 50 or conf < 0.5:
-                    continue
+                # if bbox[3] - bbox[1] < 50 or bbox[2] - bbox[0] < 50 or conf < 0.5:
+                #     continue
 
                 # 获取ROI
                 x1, y1, x2, y2 = map(int, bbox)

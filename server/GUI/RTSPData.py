@@ -38,7 +38,7 @@ class RTSPData:
 
         self.origin_frame_queue=queue.Queue(maxsize=max_num)
         # self.process_frame_queue=queue.Queue(maxsize=max_num)
-        self.process_frame_queue=asyncio.Queue(maxsize=max_num)
+        self.process_frame_queue=queue.Queue(maxsize=max_num)
 
 
 

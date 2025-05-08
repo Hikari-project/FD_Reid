@@ -174,13 +174,13 @@ def stop_analysis(rtsp:RTSP):
 
 
 # 内存占用分析模块
-import tracemalloc
-tracemalloc.start(10)  # 记录前10个内存分配点
-@app.get("/memory_snapshot")
-async def get_memory_snapshot():
-    snapshot = tracemalloc.take_snapshot()
-    top_stats = snapshot.statistics('lineno')
-    return {"memory_stats": [str(stat) for stat in top_stats[:5]]}
+# import tracemalloc
+# tracemalloc.start(10)  # 记录前10个内存分配点
+# @app.get("/memory_snapshot")
+# async def get_memory_snapshot():
+#     snapshot = tracemalloc.take_snapshot()
+#     top_stats = snapshot.statistics('lineno')
+#     return {"memory_stats": [str(stat) for stat in top_stats[:5]]}
 
 if __name__ == '__main__':
     uvicorn.run("appV2:app", host='0.0.0.0', port=3002)
