@@ -623,6 +623,7 @@ class ReIDTracker:
                     'position': (x_center, y_center),
                     'in_area': curr_in_area
                 })
+
             self.had_search_trackid_list=had_search_trackid_list
             output_frame = self._draw_match(frame.copy(),
                                             [row[0] for row in had_search_trackid_list],  # boxes

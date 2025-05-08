@@ -230,6 +230,7 @@ async def check_rtsp(rtsp: RTSP):
     h,w=valid_frame.shape[:2]
     print("宽高")
     print(w,h)
+
     # 保存首帧图片
     os.makedirs("static/frames", exist_ok=True)
     frame_id = str(uuid.uuid4())
@@ -316,21 +317,22 @@ if __name__ == "__main__":
 
     import uvicorn
 
-    # 获取主事件循环
-    mainloop = asyncio.get_event_loop()
-    asyncio.set_event_loop(mainloop)
-
-    config = uvicorn.Config('app:app',
-                         #   host="0.0.0.0",
-                            host="127.0.0.1",
-                            port=3002,
-                            http="h11",
-                            timeout_keep_alive=30,
-                            limit_concurrency=40)
-
-    # config = uvicorn.Config(app, host="127.0.0.1", port=8765, loop=main_loop)
-    server = uvicorn.Server(config)
-
-    mainloop.run_until_complete(server.serve())
+    # # 获取主事件循环
+    # mainloop = asyncio.get_event_loop()
+    # asyncio.set_event_loop(mainloop)
+    #
+    # config = uvicorn.Config('app:app',
+    #                      #   host="0.0.0.0",
+    #                         host="127.0.0.1",
+    #                         port=3002,
+    #                         http="h11",
+    #                         timeout_keep_alive=30,
+    #                         limit_concurrency=40)
+    #
+    # # config = uvicorn.Config(app, host="127.0.0.1", port=8765, loop=main_loop)
+    # server = uvicorn.Server(config)
+    #
+    # mainloop.run_until_complete(server.serve())
+    uvicorn.run('appV2:app', host='0.0.0.0', port=3002)
 
 
