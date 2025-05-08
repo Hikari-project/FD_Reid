@@ -369,7 +369,8 @@ class StreamManager:
         print(len(self.rtsp_datas))
         print(self.rtsp_datas)
         current_rtsp_data=self.rtsp_datas[video_source]
-        mainloop=current_rtsp_data.mainloop
+
+        asyncio.set_event_loop(current_rtsp_data.mainloop)
         print('...11')
         async def _process_video_task(current_rtsp_data):
             """线程内运行的任务函数"""
@@ -411,13 +412,24 @@ class StreamManager:
                     #     None,  # 使用默认的线程池执行器
                     #     lambda: tracker.process_frame(frame, 0, match_thresh, is_track)
                     # )
-                    processed_frame, info=tracker.process_frame(frame, 0, match_thresh, is_track)
-                    # 处理帧（使用线程池）
-                    # main_loop=asyncio.get_event_loop()
-                    # processed_frame, info = await main_loop.run_in_executor(
-                    #     None,
-                    #     lambda: tracker.process_frame(frame, 0, match_thresh, is_track)
+                    #processed_frame, info=tracker.process_frame(frame, 0, match_thresh, is_track)
+                    # 2. 在主线程序线程池运行同步函数（关键修复）
+                    # processed_frame, info = await asyncio.wrap_future(
+                    #     asyncio.run_coroutine_threadsafe(
+                    #         # 将同步函数包装为协程调用
+                    #
+                    #             tracker.process_frame(frame, 1, 0.15, True)
+                    #         ,
+                    #         current_rtsp_data.mainloop  # 确保在主循环中调度
+                    #     )
                     # )
+
+                    # 处理帧（使用线程池）
+                    main_loop=asyncio.get_event_loop()
+                    processed_frame, info = await main_loop.run_in_executor(
+                        None,
+                        lambda: tracker.process_frame(frame, 0, match_thresh, is_track)
+                    )
 
                    #processed_frame, info = tracker.process_frame(frame, 0, match_thresh, is_track)
                     # processed_frame, info =  asyncio.run_coroutine_threadsafe(tracker.process_frame(frame, 0, match_thresh, is_track),asyncio.get_event_loop())
@@ -433,15 +445,28 @@ class StreamManager:
                     if processed_frame is not None:
                         try:
                             print('process:',str(current_rtsp_data.process_frame_queue.qsize()))
-                            current_rtsp_data.process_frame_queue.put(processed_frame)
+                            # await current_rtsp_data.process_frame_queue.put(processed_frame)
+
+                            await asyncio.wrap_future(
+                                asyncio.run_coroutine_threadsafe(
+                                    current_rtsp_data.process_frame_queue.put(processed_frame),
+                                    current_rtsp_data.mainloop
+                                )
+                            )
                             # asyncio.run_coroutine_threadsafe(current_rtsp_data.process_frame_queue.put(processed_frame),mainloop)
                            # current_rtsp_data.process_frame_queue.put(processed_frame)
 
 
-                        except queue.Full:
+                        except asyncio.QueueFull:
                         #    print(queue_index,type(queue_index))
                             print(f"无法将帧放入队列: {e}")
-                            _ =   current_rtsp_data.process_frame_queue.get()
+                            _ =   await current_rtsp_data.process_frame_queue.get()
+                            _ = await asyncio.wrap_future(
+                                asyncio.run_coroutine_threadsafe(
+                                    current_rtsp_data.process_frame_queue.get(),
+                                    current_rtsp_data.mainloop
+                                )
+                            )
                             #await current_rtsp_data.process_frame_queue.put(processed_frame)
 
                     #
@@ -612,7 +637,7 @@ class StreamManager:
         while not current_rtsp_data.stop_event.is_set():
             print('...1')
             print('process',str(current_rtsp_data.process_frame_queue.qsize()))
-            frame =  current_rtsp_data.process_frame_queue.get()
+            frame = await current_rtsp_data.process_frame_queue.get()
 
 
             # cv2.imshow('process_frame', frame)

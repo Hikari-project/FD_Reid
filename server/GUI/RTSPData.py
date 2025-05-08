@@ -33,12 +33,15 @@ class RTSPData:
         self.stop_event = threading.Event()
         # 启动rtsp自动解码线程
         self.mainloop = asyncio.get_event_loop()
+        # 绑定到该事件循环
+        asyncio.set_event_loop(self.mainloop)
+
         self._rtsp_2_frames_thread()
 
 
         self.origin_frame_queue=queue.Queue(maxsize=max_num)
         # self.process_frame_queue=queue.Queue(maxsize=max_num)
-        self.process_frame_queue=queue.Queue(maxsize=max_num)
+        self.process_frame_queue=asyncio.Queue(maxsize=max_num)
 
 
 
