@@ -401,9 +401,15 @@ class StreamManager:
                     #     None,  # 使用默认的线程池执行器
                     #     lambda: tracker.process_frame(frame, 0, match_thresh, is_track)
                     # )
-                    processed_frame, info=await tracker.process_frame(frame, 0, match_thresh, is_track)
+                    #processed_frame, info=await tracker.process_frame(frame, 0, match_thresh, is_track)
 
-                    # processed_frame, info =  asyncio.run_coroutine_threadsafe(tracker.process_frame(frame, 0, match_thresh, is_track),asyncio.get_event_loop())
+                   # processed_frame, info = tracker.process_frame(frame, 0, match_thresh, is_track)
+                   # processed_frame, info =  asyncio.run_coroutine_threadsafe(tracker.process_frame(frame, 0, match_thresh, is_track),asyncio.get_event_loop())
+                    # 在线程池中执行同步函数
+                    processed_frame, info = await loop.run_in_executor(
+                        None,  # 使用默认线程池
+                        lambda: tracker.process_frame(frame, 0, match_thresh, is_track)
+                    )
                     #processed_frame=frame
 
                     # 将处理后的帧放入队列

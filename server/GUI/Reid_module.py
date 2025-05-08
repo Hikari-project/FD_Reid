@@ -7,7 +7,7 @@
 @Describe:
 加入log系统，加入数据库，重构为类结构，改进进出店检测逻辑
 """
-import asyncio
+
 from datetime import datetime
 import re
 import gc
@@ -461,7 +461,7 @@ class ReIDTracker:
         )
         print("搜索引擎已重新加载")
 
-    async def process_frame(self, frame=None, skip_frames=2, match_thresh=0.15, is_track=True):
+    def process_frame(self, frame=None, skip_frames=2, match_thresh=0.15, is_track=True):
         """
         处理单帧图像
 
@@ -521,25 +521,13 @@ class ReIDTracker:
         #     format='video',
         #     is_track=is_track
         # )
-        # results = self.model.track(
-        #     frame,
-        #     persist=True,
-        #     tracker=cfgs.YOLO_TRACKER_TYPE,
-        #     conf=0.2,
-        #     iou=0.4,
-        #     # classes=self.reid_pipeline._target_class_idx_list
-        # )
-        # 异步执行YOLO目标检测
-        loop = asyncio.get_running_loop()
-        results = await loop.run_in_executor(
-            None,
-            lambda: self.model.track(
-                frame,
-                persist=True,
-                tracker=cfgs.YOLO_TRACKER_TYPE,
-                conf=0.2,
-                iou=0.4
-            )
+        results = self.model.track(
+            frame,
+            persist=True,
+            tracker=cfgs.YOLO_TRACKER_TYPE,
+            conf=0.2,
+            iou=0.4,
+            classes=self.reid_pipeline._target_class_idx_list
         )
 
         # Extract detection data from results
@@ -568,8 +556,8 @@ class ReIDTracker:
         if is_track and track_ids is not None and len(track_ids) > 0:
             for bbox, track_id, conf in zip(boxes, track_ids, confs):
                 # 质量检测
-                # if bbox[3] - bbox[1] < 50 or bbox[2] - bbox[0] < 50 or conf < 0.5:
-                #    continue
+                if bbox[3] - bbox[1] < 50 or bbox[2] - bbox[0] < 50 or conf < 0.5:
+                    continue
 
                 # 获取ROI
                 x1, y1, x2, y2 = map(int, bbox)
@@ -623,7 +611,6 @@ class ReIDTracker:
                     'position': (x_center, y_center),
                     'in_area': curr_in_area
                 })
-
             self.had_search_trackid_list=had_search_trackid_list
             output_frame = self._draw_match(frame.copy(),
                                             [row[0] for row in had_search_trackid_list],  # boxes
@@ -650,7 +637,7 @@ class ReIDTracker:
 
         # 显示计数信息
         counts = self.log_system.get_counts()
-        cv2.putText(output_frame, f"Enter: {counts['enter'] + counts['re_enter']}", (30, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        cv2.putText(output_frame, f"Enter: {counts['enter']}", (30, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
         cv2.putText(output_frame, f"Exit: {counts['exit']}", (30, 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
         cv2.putText(output_frame, f"Pass: {counts['pass']}", (30, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
         cv2.putText(output_frame, f"Re_enter: {counts['re_enter']}", (30, 270), cv2.FONT_HERSHEY_SIMPLEX, 1,
