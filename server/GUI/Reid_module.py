@@ -274,7 +274,7 @@ class ReIDTracker:
 
         # 显示计数信息
         counts = self.log_system.get_counts()
-        cv2.putText(output_frame, f"Enter: {counts['enter']}", (30, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        cv2.putText(output_frame, f"Enter: {counts['enter'] + counts['re_enter']}", (30, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
         cv2.putText(output_frame, f"Exit: {counts['exit']}", (30, 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
         cv2.putText(output_frame, f"Pass: {counts['pass']}", (30, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
         cv2.putText(output_frame, f"Re_enter: {counts['re_enter']}", (30, 270), cv2.FONT_HERSHEY_SIMPLEX, 1,
@@ -527,7 +527,7 @@ class ReIDTracker:
             tracker=cfgs.YOLO_TRACKER_TYPE,
             conf=0.2,
             iou=0.4
-           # classes=self.reid_pipeline._target_class_idx_list
+            # classes=self.reid_pipeline._target_class_idx_list
         )
        # print(results)
         # Extract detection data from results
