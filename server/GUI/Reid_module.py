@@ -1107,7 +1107,7 @@ if __name__ == "__main__":
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
     # 确认YOLO模型文件存在
-    yolo_model_pt = os.path.join(project_root, 'GUI/models/yolov8x.pt')
+    yolo_model_pt = os.path.join(project_root, 'GUI/models/best.pt')
     if not os.path.exists(yolo_model_pt):
         print(f"模型文件 {yolo_model_pt} 不存在，使用默认路径")
     else:

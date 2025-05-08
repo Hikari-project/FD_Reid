@@ -372,6 +372,7 @@ class StreamManager:
 
         async def _process_video_task(current_rtsp_data):
             """线程内运行的任务函数"""
+
             # 创建日志系统
             log_system = LogSystem()
 
@@ -380,10 +381,10 @@ class StreamManager:
             print("temp_data:", str(temp_data))
             if not tracker.setup_processing(None, temp_data):
                 print(f"无法设置视频处理环境")
-
-
                 return
             frame_count=0
+            #current_rtsp_data.origin_frame_queue=asyncio.Queue(maxsize=1)
+
             while not current_rtsp_data.stop_event.is_set():
                 try:
                     # 尝试读取帧
@@ -404,18 +405,19 @@ class StreamManager:
                     #processed_frame, info=await tracker.process_frame(frame, 0, match_thresh, is_track)
 
                     processed_frame, info = tracker.process_frame(frame, 0, match_thresh, is_track)
-                   # processed_frame, info =  asyncio.run_coroutine_threadsafe(tracker.process_frame(frame, 0, match_thresh, is_track),asyncio.get_event_loop())
+                    # processed_frame, info =  asyncio.run_coroutine_threadsafe(tracker.process_frame(frame, 0, match_thresh, is_track),asyncio.get_event_loop())
                     # 在线程池中执行同步函数
                     # processed_frame, info = await loop.run_in_executor(
                     #     None,  # 使用默认线程池
                     #     lambda: tracker.process_frame(frame, 0, match_thresh, is_track)
                     # )
+
                     #processed_frame=frame
 
                     # 将处理后的帧放入队列
                     if processed_frame is not None:
                         try:
-                            await current_rtsp_data.process_frame_queue.put(processed_frame)
+                            current_rtsp_data.process_frame_queue.put(processed_frame)
                             # asyncio.run_coroutine_threadsafe(current_rtsp_data.process_frame_queue.put(processed_frame),mainloop)
                            # current_rtsp_data.process_frame_queue.put(processed_frame)
 
@@ -423,7 +425,7 @@ class StreamManager:
                         except queue.Full:
                             #print(queue_index,type(queue_index))
                             #print(f"无法将帧放入队列: {e}")
-                            _ = await current_rtsp_data.process_frame_queue.get()
+                            _ =  current_rtsp_data.process_frame_queue.get()
                             #await current_rtsp_data.process_frame_queue.put(processed_frame)
 
                     #
@@ -465,7 +467,18 @@ class StreamManager:
             except Exception as e:
                 print(f"无法获取{window_name}的统计结果: {e}")
 
-
+        # ---------- 启动线程 ----------
+        # mainloop=current_rtsp_data
+        # def start_thread():
+        #     thread = threading.Thread(
+        #         target=main_loop.run_until_complete,
+        #         args=(_process_video_task(current_rtsp_data, main_loop),)
+        #     )
+        #     thread.start()
+        #
+        # # 启动主循环
+        # start_thread()
+        # main_loop.run_forever()
 
         def _thread_target():
             """线程入口：创建新事件循环"""
@@ -477,10 +490,13 @@ class StreamManager:
                 loop.close()
 
 
+
+
         # 创建并启动线程
         thread = threading.Thread(target=_thread_target, daemon=True)
         thread.start()
         threading_dict={}
+
         # threading_dict={
         #     "thread": thread,
         #     "stop_event": stop_event,
@@ -549,7 +565,6 @@ class StreamManager:
                 return key
 
 
-
     def format_data(self, video_datas):
         config_list = [
             {
@@ -581,7 +596,7 @@ class StreamManager:
         while not current_rtsp_data.stop_event.is_set():
             print('...1')
             print('process',str(current_rtsp_data.process_frame_queue.qsize()))
-            frame = await current_rtsp_data.process_frame_queue.get()
+            frame =  current_rtsp_data.process_frame_queue.get()
 
 
             # cv2.imshow('process_frame', frame)
