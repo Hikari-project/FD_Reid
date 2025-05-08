@@ -446,10 +446,10 @@ class StreamManager:
 
                     #
                     #processed_frame=frame
-                    cv2.imshow("processed_frame", processed_frame)
-
-
-                    cv2.waitKey(1)
+                    # cv2.imshow("processed_frame", processed_frame)
+                    #
+                    #
+                    # cv2.waitKey(1)
 
 
                 except Exception as e:
