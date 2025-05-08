@@ -295,16 +295,14 @@ async def get_latest_frame(frame_id: str):
 async def video_stream(stream_id: str):
     if stream_id not in stream_objects:
         raise HTTPException(status_code=404, detail="推流不存在")
+
     return StreamingResponse(
         generate_mjpeg(stream_objects[stream_id]['rtsp_url']),
         media_type="multipart/x-mixed-replace;boundary=frame"
     )
 
-
 import tracemalloc
-
 tracemalloc.start(10)  # 记录前10个内存分配点
-
 @app.get("/memory_snapshot")
 async def get_memory_snapshot():
     snapshot = tracemalloc.take_snapshot()

@@ -65,7 +65,10 @@ from libs.rtsp_check import is_img_not_validV2
 mainloop = asyncio.get_event_loop()
 asyncio.set_event_loop(mainloop)
 
+from concurrent.futures import ThreadPoolExecutor
 
+# 创建编码线程池（根据CPU核心数调整）
+encode_executor = ThreadPoolExecutor(max_workers=4)
 # 添加自定义JSON编码器
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -460,7 +463,7 @@ class StreamManager:
                         except asyncio.QueueFull:
                         #    print(queue_index,type(queue_index))
                             print(f"无法将帧放入队列: {e}")
-                            _ =   await current_rtsp_data.process_frame_queue.get()
+                            # _ =   await current_rtsp_data.process_frame_queue.get()
                             _ = await asyncio.wrap_future(
                                 asyncio.run_coroutine_threadsafe(
                                     current_rtsp_data.process_frame_queue.get(),
@@ -625,6 +628,11 @@ class StreamManager:
             print(f"流索引: {stream['stream_index']}")
             print()
 
+    def _encode_frame(self, frame):
+        """独立编码函数"""
+        # 可在此处添加硬件加速逻辑
+        _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
+        return buffer.tobytes()
 
 
     async def consume_frame(self, rtsp_url):
@@ -632,19 +640,35 @@ class StreamManager:
         # video_id=0
         print("视频流：{}".format(rtsp_url))
 
+        loop = asyncio.get_event_loop()
 
         current_rtsp_data=self.rtsp_datas[rtsp_url]
         while not current_rtsp_data.stop_event.is_set():
-            print('...1')
+            print('..1.')
             print('process',str(current_rtsp_data.process_frame_queue.qsize()))
             frame = await current_rtsp_data.process_frame_queue.get()
 
 
             # cv2.imshow('process_frame', frame)
             # cv2.waitKey(1)
+            # 检查是否支持CUDA
+            if cv2.cuda.getCudaEnabledDeviceCount() > 0:
+                gpu_frame = cv2.cuda_GpuMat()
+                gpu_frame.upload(frame)
+                # 使用GPU编码
+                _, buffer = cv2.imencode('.jpg', gpu_frame.download())
+            else:
+                _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
 
-            _, buffer = cv2.imencode('.jpg', frame)
-            _frame_cache = buffer.tobytes()
+            # 将编码任务提交到线程池
+            _frame_cache = await loop.run_in_executor(
+                encode_executor,
+                self._encode_frame,  # 独立编码函数
+                frame
+            )
+
+
+
             yield (
                     b'--frame\r\n'
                     b'Content-Type: image/jpeg\r\n\r\n' +
