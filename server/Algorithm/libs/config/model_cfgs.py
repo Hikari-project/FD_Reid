@@ -6,7 +6,6 @@ YOLO_LABELS = {0: 'person', 1: 'bicycle', 2: 'car', 3: 'motorcycle', 4: 'airplan
 
 YOLO_MODEL_PATH = './models/yolo12s.onnx'
 YOLO_MODEL_PATH_PT = './models/best.pt' #yolo12s.pt
-#YOLO_MODEL_PATH_PT = './models/best.pt' #yolo12s.pt
 
 YOLO_DEFAULT_LABEL = [0] # 0 is 'person'
 YOLO_MIN_SIZE = 0
