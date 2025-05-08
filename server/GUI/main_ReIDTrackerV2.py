@@ -403,21 +403,22 @@ class StreamManager:
                     # )
                     #processed_frame, info=await tracker.process_frame(frame, 0, match_thresh, is_track)
 
-                   # processed_frame, info = tracker.process_frame(frame, 0, match_thresh, is_track)
+                    processed_frame, info = tracker.process_frame(frame, 0, match_thresh, is_track)
                    # processed_frame, info =  asyncio.run_coroutine_threadsafe(tracker.process_frame(frame, 0, match_thresh, is_track),asyncio.get_event_loop())
                     # 在线程池中执行同步函数
-                    processed_frame, info = await loop.run_in_executor(
-                        None,  # 使用默认线程池
-                        lambda: tracker.process_frame(frame, 0, match_thresh, is_track)
-                    )
+                    # processed_frame, info = await loop.run_in_executor(
+                    #     None,  # 使用默认线程池
+                    #     lambda: tracker.process_frame(frame, 0, match_thresh, is_track)
+                    # )
                     #processed_frame=frame
 
                     # 将处理后的帧放入队列
                     if processed_frame is not None:
                         try:
                             await current_rtsp_data.process_frame_queue.put(processed_frame)
-                            #asyncio.run_coroutine_threadsafe(current_rtsp_data.process_frame_queue.put(processed_frame),mainloop)
+                            # asyncio.run_coroutine_threadsafe(current_rtsp_data.process_frame_queue.put(processed_frame),mainloop)
                            # current_rtsp_data.process_frame_queue.put(processed_frame)
+
 
                         except queue.Full:
                             #print(queue_index,type(queue_index))
@@ -434,7 +435,7 @@ class StreamManager:
 
 
                 except Exception as e:
-                    print(f"处理{window_name}时出错: {str(e)}")
+                   # print(f"处理{window_name}时出错: {str(e)}")
                     import traceback
                     traceback.print_exc()
 
