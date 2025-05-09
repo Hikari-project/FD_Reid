@@ -396,6 +396,9 @@ class StreamManager:
                     # 同步队列获取，（使用线程池避免阻塞）
                    # print(current_rtsp_data.origin_frame_queue.qsize())
                     print('origin:', str(current_rtsp_data.origin_frame_queue.qsize()))
+                    if current_rtsp_data.process_frame_queue.qsize()>5:
+                        continue
+                        asyncio.sleep(0.05)
                     frame = current_rtsp_data.origin_frame_queue.get()
                     # frame= await mainloop.run_in_executor(
                     #     None,
