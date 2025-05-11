@@ -185,6 +185,13 @@ def stop_analysis(rtsp:RTSP):
 def get_rtsp():
     """返回rtsp流信息"""
     return {"ret":0,"HandleRTSPData":app.state.handleRTSPData}
+
+
+@app.post('/customer-flow/set-rtsp-name')
+def set_rtsp_name(rtsp:RTSP):
+    """返回rtsp流信息"""
+    app.state.handleRTSPData[rtsp.rtsp_url].name = rtsp.name
+    return {"ret":0,"message":f"{rtsp.rtsp_url}设置别名{rtsp.name} 设置成功"}
 # 内存占用分析模块
 # import tracemalloc
 # tracemalloc.start(10)  # 记录前10个内存分配点

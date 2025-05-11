@@ -154,9 +154,6 @@ class StreamManager:
         self.rtsp_datas=rtsp_datas
 
 
-    def load_model(self):
-        pass
-
     def is_rtsp_url(self, url: str) -> bool:
         """
         检查URL是否为RTSP流
@@ -281,68 +278,6 @@ class StreamManager:
             return mjpeg_list
 
 
-    def update_stream_status(self, index: int, active: bool, reconnect_increment=False) -> bool:
-        """
-        更新流状态
-
-        Args:
-            index: 流索引
-            active: 是否活跃
-            reconnect_increment: 是否增加重连计数
-
-        Returns:
-            bool: 更新是否成功
-        """
-        with self.lock:
-            if 0 <= index < len(self.streams):
-                self.streams[index].active = active
-                self.streams[index].last_update = time.time()
-
-                if reconnect_increment:
-                    self.streams[index].reconnect_count += 1
-
-                return True
-            return False
-
-
-    def reset_reconnect_count(self, index: int) -> bool:
-        """
-        重置流的重连计数
-
-        Args:
-            index: 流索引
-
-        Returns:
-            bool: 重置是否成功
-        """
-        with self.lock:
-            if 0 <= index < len(self.streams):
-                self.streams[index].reconnect_count = 0
-                return True
-            return False
-
-
-
-
-
-    def should_reconnect(self, index: int) -> bool:
-        """
-        检查是否应该继续尝试重连
-
-        Args:
-            index: 流索引
-
-        Returns:
-            bool: 是否应该继续尝试重连
-        """
-        with self.lock:
-            if 0 <= index < len(self.streams):
-                return (self.streams[index].reconnect_count < self.max_reconnect and
-                        self.streams[index].active and
-                        self.streams[index].is_rtsp)
-            return False
-
-
 
     def process_video_in_thread(self, video_source, temp_data={},
                                 skip_frames=2, match_thresh=0.15, is_track=True, save_video=False,
@@ -400,6 +335,16 @@ class StreamManager:
                         continue
                         asyncio.sleep(0.05)
                     frame = current_rtsp_data.origin_frame_queue.get()
+                    frame_count+=1
+                    # 跳帧塞入待处理队列
+                    if frame_count%2:
+                        try:
+                            processed_frame=tracker.draw_origin_image(frame)
+
+                            await current_rtsp_data.process_frame_queue.put(processed_frame)
+                        except Exception as e:
+                            pass
+                        continue
                     # frame= await mainloop.run_in_executor(
                     #     None,
                     #     lambda: current_rtsp_data.origin_frame_queue.get()
@@ -569,17 +514,6 @@ class StreamManager:
                 except asyncio.QueueEmpty:
                     break
 
-    def get_valid_origin_queue_index(self):
-        """
-        查询目前哪个队列可以用
-        :return:
-        """
-        print(self.origin_frame_queue_status.items())
-        for key, value in self.origin_frame_queue_status.items():
-            if value:
-                self.origin_frame_queue[key] = queue.Queue(maxsize=10) # 清空这个队列
-                self.origin_frame_queue_status[key] = False  # 这个队列已使用
-                return key
 
 
     def stop_process_video_in_thread(self,rtsp_url):
@@ -599,37 +533,6 @@ class StreamManager:
 
 
 
-    def get_valid_queue_index(self):
-        """
-        查询目前哪个队列可以用
-        :return:
-        """
-        print(self.handle_queue_status.items())
-        for key, value in self.handle_queue_status.items():
-            if value:
-                self.handle_frame[key] = FixedSizeAsyncQueue(maxsize=10)  # 清空这个队列
-                self.handle_queue_status[key] = False  # 这个队列已使用
-                return key
-
-
-    def format_data(self, video_datas):
-        config_list = [
-            {
-                "rtsp_video": 'rtsp://localhost:5555/live',
-                "points": [[500, 600], [750, 600], [750, 400], [500, 400]]
-            }
-        ]
-
-        # 设置流并获取MJPEG URL列表
-        mjpeg_list = self.setup_streams(config_list, show_windows=True)
-        # 打印MJPEG URL列表 (这些URL可以提供给前端显示)
-        print("MJPEG流列表:")
-        for stream in mjpeg_list:
-            print(f"原始URL: {stream['source_url']}")
-            print(f"MJPEG URL: {stream['mjpeg_url']}")
-            print(f"是否RTSP: {stream['is_rtsp']}")
-            print(f"流索引: {stream['stream_index']}")
-            print()
 
     def _encode_frame(self, frame):
         """独立编码函数"""
@@ -670,14 +573,11 @@ class StreamManager:
                 frame
             )
 
-
-
             yield (
                     b'--frame\r\n'
                     b'Content-Type: image/jpeg\r\n\r\n' +
                     _frame_cache + b'\r\n'
             )
-
 
 
 def clear_database():

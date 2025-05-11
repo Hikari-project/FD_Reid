@@ -151,8 +151,13 @@ class ReIDTracker:
 
         # fps的队列
         self.fps_list=[]
+        self.fps=10
+
         # 保存渲染行人的队列
         self.had_search_trackid_list=[[],[],[]]
+
+        # 存放上一帧处理的数据信息
+        self.pre_data=None
 
     def _create_track_info(self, track_id: int) -> dict:
         """创建跟踪信息字典"""
@@ -525,10 +530,9 @@ class ReIDTracker:
             frame,
             persist=True,
             tracker=cfgs.YOLO_TRACKER_TYPE,
-            conf=0.2,
-            iou=0.4
-            # classes=self.reid_pipeline._target_class_idx_list
-        )
+            conf=0.6,
+            iou=0.4,
+            classes=[0]        )
        # print(results)
         # Extract detection data from results
         boxes = []
@@ -616,6 +620,9 @@ class ReIDTracker:
                                             [row[0] for row in had_search_trackid_list],  # boxes
                                             [row[1] for row in had_search_trackid_list],  # labels(id,status)
                                             [row[2] for row in had_search_trackid_list])  # confs
+            self.pre_data=[[row[0] for row in had_search_trackid_list],  # boxes
+                                            [row[1] for row in had_search_trackid_list],  # labels(id,status)
+                                            [row[2] for row in had_search_trackid_list]]
         else:
             output_frame = frame.copy()
 
@@ -628,6 +635,7 @@ class ReIDTracker:
         info['fps'] = sum(self.fps_list)/len(self.fps_list)
         fps=sum(self.fps_list) / len(self.fps_list)
         self.start_time=time.time()
+        self.fps=fps
 
         # 绘制ROI区域 取消绘制roi
         self._draw_rois(output_frame, self.json_data)
@@ -649,7 +657,6 @@ class ReIDTracker:
         # 保存视频
         if hasattr(self, 'video_writer') and self.video_writer is not None:
             self.video_writer.write(output_frame)
-
         # 定期执行内存清理
         current_time = time.time()
         if current_time - self.last_cleanup_time > self.cleanup_interval:
@@ -658,6 +665,33 @@ class ReIDTracker:
 
         info['counts'] = counts
         return output_frame, info
+    def draw_origin_image(self,frame):
+        """给原始画面绘图"""
+        # 绘制框框
+        if self.pre_data:
+            frame=self._draw_match(frame,self.pre_data[0],self.pre_data[1],self.pre_data[2])
+
+        # 绘制ROI区域 取消绘制roi
+        self._draw_rois(frame, self.json_data)
+
+        # 在处理后的图片上显示信息
+        cv2.putText(frame, f'FPS:{self.fps:.2f}', (30, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+
+
+        # 绘制左上角的信息
+        counts = self.log_system.get_counts()
+        cv2.putText(frame, f"Enter: {counts['enter'] + counts['re_enter']}", (30, 30), cv2.FONT_HERSHEY_SIMPLEX,
+                    1, (0, 255, 0), 2)
+        cv2.putText(frame, f"Exit: {counts['exit']}", (30, 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        cv2.putText(frame, f"Pass: {counts['pass']}", (30, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        cv2.putText(frame, f"Re_enter: {counts['re_enter']}", (30, 270), cv2.FONT_HERSHEY_SIMPLEX, 1,
+                    (0, 255, 0), 2)
+        cv2.putText(frame, f"Area: {len(self.current_in_roi)}", (30, 210), cv2.FONT_HERSHEY_SIMPLEX, 1,
+                    (0, 255, 0), 2)
+
+
+
+        return frame
 
     def _update_track_history_and_status(self, track_id, x_center, y_center, curr_in_area, curr_point, info):
         """更新轨迹历史和区域状态"""
@@ -1048,51 +1082,7 @@ class ReIDTracker:
         cv2.destroyAllWindows()
         print("资源已释放")
 
-    def run(self, video_path, tempData={}, skip_frames=2, match_thresh=0.5, is_track=True, save_video=True):
-        """
-        处理视频（保持原有功能不变，但使用单帧处理接口）
-        """
-        # 设置处理环境
-        if not self.setup_processing(video_path, tempData):
-            return
 
-        # 设置视频写入器（如果需要保存）
-        if save_video:
-            self.setup_video_writer(video_path)
-
-        # 创建窗口
-        cv2.namedWindow("Processed Frame", cv2.WINDOW_NORMAL)
-
-        try:
-            # 主循环
-            while True:
-                # 使用单帧处理接口
-                frame, info = self.process_frame(None, skip_frames, match_thresh, is_track)
-
-                if frame is None:
-                    print("视频读取完毕或出错。")
-                    break
-
-                # 如果是跳帧，则继续
-                if 'skipped' in info and info['skipped']:
-                    continue
-
-                # 显示处理后的帧
-                cv2.imshow("Processed Frame", frame)
-
-                # 按 'q' 键退出
-                if cv2.waitKey(1) & 0xFF == ord('q'):
-                    break
-        finally:
-            # 释放资源
-            self.release()
-
-        # 打印总结果
-        counts = self.log_system.get_counts()
-        print(f"Enter Count: {counts['enter']}")
-        print(f"Exit Count: {counts['exit']}")
-        print(f"Pass Count: {counts['pass']}")
-        print(f"Re-enter Count: {counts['re_enter']}")
 
 
 if __name__ == "__main__":
@@ -1195,206 +1185,3 @@ if __name__ == "__main__":
     import threading
 
 
-    # 线程函数 - 修改后的版本，使用同一个配置文件
-    def run_tracker(tracker, video_path, config_path, idx):
-        tracker_name = f"Camera {idx + 1}"
-        window_name = f"Camera {idx + 1}: {os.path.basename(str(video_path))}"
-        print(f"启动 {tracker_name}: {video_path}")
-
-        # 创建并设置窗口
-        cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
-        cv2.resizeWindow(window_name, 800, 600)
-
-        # 根据索引计算窗口位置（2x2布局）
-        screen_width = 1920  # 假设屏幕宽度
-        screen_height = 1080  # 假设屏幕高度
-        window_width = screen_width // 2
-        window_height = screen_height // 2
-        pos_x = (idx % 2) * window_width
-        pos_y = (idx // 2) * window_height
-
-        # 移动窗口到指定位置
-        cv2.moveWindow(window_name, pos_x, pos_y)
-
-        try:
-            # 初始化处理环境 - 所有摄像头使用同一个配置文件
-            success = tracker.setup_processing(tempDataPath=config_path)
-            if not success:
-                print(f"错误: {tracker_name} 处理环境初始化失败")
-                cv2.destroyWindow(window_name)
-                return
-
-            # 手动处理视频流，而不是调用tracker.run
-            video_source = video_path
-
-            # 处理视频源
-            if isinstance(video_source, int) or (isinstance(video_source, str) and video_source.isdigit()):
-                cap = cv2.VideoCapture(int(video_source))
-                print(f"{tracker_name}: 打开摄像头 {video_source}")
-            else:
-                cap = cv2.VideoCapture(video_source)
-                print(f"{tracker_name}: 打开视频 {video_source}")
-
-            if not cap.isOpened():
-                print(f"{tracker_name}: 无法打开视频源")
-                cv2.destroyWindow(window_name)
-                return
-
-            # 获取视频信息
-            frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-            frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            fps = cap.get(cv2.CAP_PROP_FPS)
-            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-
-            print(f"{tracker_name}: 视频尺寸 {frame_width}x{frame_height}, FPS: {fps:.2f}")
-
-            # 创建视频写入器（如果需要保存视频）
-            video_writer = None
-            if args.save_video:
-                output_folder = "output_videos"
-                os.makedirs(output_folder, exist_ok=True)
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                output_path = os.path.join(output_folder, f"camera_{idx + 1}_{timestamp}.mp4")
-                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-                video_writer = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
-                print(f"{tracker_name}: 保存视频到 {output_path}")
-
-            # 处理循环
-            frame_count = 0
-            processed_count = 0
-            start_time = time.time()
-
-            # 创建自己的线程运行状态变量
-            running = True
-
-            while running and cap.isOpened():
-                ret, frame = cap.read()
-                if not ret:
-                    # 对于视频文件，可以考虑循环播放
-                    if isinstance(video_source, str) and not video_source.isdigit():
-                        print(f"{tracker_name}: 视频结束，重新开始")
-                        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                        continue
-                    else:
-                        print(f"{tracker_name}: 无法读取帧")
-                        break
-
-                frame_count += 1
-
-                # 跳帧处理
-                if args.skip_frames > 0 and frame_count % args.skip_frames != 0:
-                    continue
-
-                processed_count += 1
-
-                # 处理当前帧
-                processed_frame, info = tracker.process_frame(
-                    frame=frame,
-                    skip_frames=0,  # 已经在外部跳帧了
-                    match_thresh=args.match_thresh,
-                    is_track=True
-                )
-
-                # 计算并显示FPS
-                elapsed_time = time.time() - start_time
-                if elapsed_time > 0:
-                    current_fps = processed_count / elapsed_time
-
-                    # 添加FPS和信息到帧
-                    if processed_frame is not None:
-                        cv2.putText(
-                            processed_frame,
-                            f"FPS: {current_fps:.1f} | People: {tracker.pre}",
-                            (processed_frame.shape[1] - 280, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2
-                        )
-
-                        # 显示帧
-                        cv2.imshow(window_name, processed_frame)
-
-                        # 保存视频
-                        if video_writer is not None:
-                            video_writer.write(processed_frame)
-
-                # 处理键盘事件
-                key = cv2.waitKey(1) & 0xFF
-                if key == 27 or key == ord('q'):  # ESC或q键
-                    running = False
-                    break
-
-                # 定期打印状态
-                if processed_count % 100 == 0:
-                    print(f"{tracker_name}: 已处理 {processed_count} 帧，当前FPS: {current_fps:.1f}")
-
-        except Exception as e:
-            print(f"{tracker_name} 处理时出错: {str(e)}")
-            import traceback
-            traceback.print_exc()
-        finally:
-            # 释放资源
-            if 'cap' in locals() and cap is not None:
-                cap.release()
-
-            if 'video_writer' in locals() and video_writer is not None:
-                video_writer.release()
-
-            # 释放跟踪器
-            tracker.release()
-
-            # 关闭窗口
-            cv2.destroyWindow(window_name)
-
-            print(f"{tracker_name} 处理完成")
-
-
-    # 创建并启动所有线程
-    for i, video_path in enumerate(args.video_paths):
-        # 创建跟踪器实例
-        tracker = ReIDTracker(log_system=log_system)
-        trackers.append(tracker)
-
-        # 创建并启动线程 - 所有线程使用同一个配置文件
-        thread = threading.Thread(
-            target=run_tracker,
-            args=(tracker, video_path, config_path, i),
-            name=f"Tracker_{i + 1}"
-        )
-        thread.daemon = True  # 设为守护线程
-        threads.append(thread)
-        thread.start()
-
-        # 错开启动时间
-        time.sleep(2.0)  # 给每个摄像头足够的初始化时间
-
-    print(f"已启动 {len(threads)} 个摄像头线程，所有摄像头使用配置: {config_path}")
-
-    # 等待所有线程完成
-    try:
-        # 主循环，检测按键
-        print("主程序运行中，按'q'键或ESC键退出...")
-        while any(t.is_alive() for t in threads):
-            # 主线程也需要处理按键事件，保持UI响应
-            key = cv2.waitKey(100) & 0xFF
-            if key == 27 or key == ord('q'):  # ESC或q键
-                print("用户按键退出")
-                break
-            time.sleep(0.1)
-    except KeyboardInterrupt:
-        print("用户中断执行 (Ctrl+C)")
-    finally:
-        # 释放所有资源
-        print("正在停止所有摄像头...")
-        for tracker in trackers:
-            try:
-                tracker.release()
-            except:
-                pass
-
-        # 等待线程结束
-        for thread in threads:
-            if thread.is_alive():
-                thread.join(timeout=3)
-
-        # 关闭所有窗口
-        cv2.destroyAllWindows()
-
-        print("程序已退出")

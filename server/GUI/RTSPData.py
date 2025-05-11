@@ -20,7 +20,7 @@ class RTSPData:
     """
     RTSPData RTSP流数据实例化
     """
-    def __init__(self ,rtsp_url,max_num=3):
+    def __init__(self ,rtsp_url,max_num=3,name=''):
         # 创建链接
         self.cap=cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
         self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 3)  # 设置缓冲区大小
@@ -38,7 +38,7 @@ class RTSPData:
         asyncio.set_event_loop(self.mainloop)
 
         self._rtsp_2_frames_thread()
-
+        self.name=name
 
         self.origin_frame_queue=queue.Queue(maxsize=max_num)
         # self.process_frame_queue=queue.Queue(maxsize=max_num)
@@ -109,7 +109,7 @@ class RTSPData:
 
 class HandleRTSPData:
     """已处理的RTSP流信息"""
-    def __init__(self,rtsp_url='',frame_url='',mjpeg_stream='',mjpeg_url='',name=''):
+    def __init__(self,rtsp_url='',frame_url='',mjpeg_stream='',mjpeg_url='',name='hello'):
         self.rtsp_url=rtsp_url
         self.frame_url=frame_url
         self.mjpeg_stream=mjpeg_stream  # 原始的mjpeg
