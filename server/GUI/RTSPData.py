@@ -10,6 +10,7 @@
 import asyncio
 import queue
 import threading
+import time
 import uuid
 import cv2
 
@@ -105,3 +106,13 @@ class RTSPData:
             print("队列已满，丢弃最旧帧")
             _ = await self.origin_frame_queue.get()
             await self.origin_frame_queue.put(frame)
+
+class HandleRTSPData:
+    """已处理的RTSP流信息"""
+    def __init__(self,rtsp_url='',frame_url='',mjpeg_stream='',mjpeg_url='',name=''):
+        self.rtsp_url=rtsp_url
+        self.frame_url=frame_url
+        self.mjpeg_stream=mjpeg_stream  # 原始的mjpeg
+        self.mjpeg_url=mjpeg_url  # 已处理的mjpeg
+        self.name=name
+        self.create_time=time.ctime()

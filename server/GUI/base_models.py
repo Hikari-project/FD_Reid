@@ -13,6 +13,7 @@ from typing import List
 
 class RTSP(BaseModel):
     rtsp_url:str
+    name:str=''
 
 class VideoData(BaseModel):
     """视频分析基础数据模型"""
@@ -38,3 +39,7 @@ class VideoData(BaseModel):
 class VideoConfig(BaseModel):
     """单个视频流配置"""
     videos: List[VideoData]
+
+
+
+

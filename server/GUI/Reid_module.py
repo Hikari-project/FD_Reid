@@ -962,6 +962,7 @@ class ReIDTracker:
                 del self.object_status[track_id]
             if track_id in self.counted_objects:
                 self.counted_objects.remove(track_id)
+
             # 增加对其他变量的清理
             if 0 <= track_id < 10000:  # 确保ID在qualityl索引范围内
                 self.qualityl[track_id] = 0.0

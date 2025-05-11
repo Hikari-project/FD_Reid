@@ -40,6 +40,9 @@ async def lifespan(app:FastAPI):
     # 知道stream_id 返回rtsp_url
     app.state.stream_2_rtsp_dict={}
 
+    # 已处理的RTSP流信息
+    app.state.handleRTSPData={}
+
 
     # 视频的线程信息
     app.state.video_thread_info={}
@@ -86,7 +89,7 @@ def rtsp_generate_mjpeg(rtsp_url):
         except Exception as e:
             print('rtsp_generate_mjpeg',str(e))
     cap.release()
-
+from RTSPData import HandleRTSPData
 @app.post('/customer-flow/check-rtsp')
 async def check_rtsp(rtsp:RTSP):
     # 实例化rtsp对象
@@ -114,6 +117,9 @@ async def check_rtsp(rtsp:RTSP):
         media_type="multipart/x-mixed-replace;boundary=frame"
     )).start()
 
+    # 存储已处理信息
+    hanle_rtsp_data=HandleRTSPData(rtsp_url=rtsp.rtsp_url,frame_url=f"/static/frames/{rtsp_data.stream_id}.jpg",mjpeg_stream=f"/customer-flow/video-stream/{rtsp_data.stream_id}",name=rtsp_data.name)
+    app.state.handleRTSPData[rtsp.rtsp_url]=hanle_rtsp_data
     return {
         "status": "success",
         "frame_id": rtsp_data.stream_id,
@@ -165,6 +171,9 @@ async def custome_analysisV2(video_config:VideoConfig):
 
     # 启动处理线程 ，存储处理线程的信息,队列信息
     app.state.video_thread_info[rtsp_data.stream_id] = app.state.stream_manager.process_video_in_thread(config[0]['rtsp_url'],config[0])
+
+    # 存储rtsp流信息
+    app.state.handleRTSPData[config[0]['rtsp_url']].mjpeg_url=mjpeg_list[0]['mjpeg_url']
     return {"ret": 0, "message": '已开启', "res": mjpeg_list}
 
 @app.post('/customer-flow/stop-analysis')
@@ -172,7 +181,10 @@ def stop_analysis(rtsp:RTSP):
     app.state.stream_manager.stop_process_video_in_thread(rtsp.rtsp_url)
     return {"ret":0,"message":"停止成功"}
 
-
+@app.get('/customer-flow/get-rtsp')
+def get_rtsp():
+    """返回rtsp流信息"""
+    return {"ret":0,"HandleRTSPData":app.state.handleRTSPData}
 # 内存占用分析模块
 # import tracemalloc
 # tracemalloc.start(10)  # 记录前10个内存分配点

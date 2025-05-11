@@ -11,7 +11,7 @@ import cv2
 from ultralytics import YOLO
 
 # 初始化YOLOv5模型（自动下载或加载本地权重）
-model = YOLO('best.pt')  # 使用yolov8n.pt for YOLOv8
+model = YOLO('human_face.pt')  # 使用yolov8n.pt for YOLOv8
 
 # RTSP流地址（替换成你的摄像头地址）
 rtsp_url = "rtsp://localhost:5557/live"
