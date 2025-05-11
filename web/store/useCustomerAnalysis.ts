@@ -7,10 +7,12 @@ import type {
   RtspSourceInfo,
   Point,
   ZoneType,
+  RtspResponse,
+  initialRtspStreamInfo
 } from '@/store/types';
 
 //export const backendUrl = process.env.VITE_BACKEND_URL;
-export const backendUrl = 'http://127.0.0.1:3002'
+export const backendUrl = 'http://192.168.21.161:3002'
 
 async function fetchFirstFrameFromBackend(
   rtspUrl: string
@@ -85,6 +87,36 @@ async function startAnalysisOnBackend(
   return data;
 }
 
+// New function to fetch initial streams from backend
+async function fetchInitialStreamsFromBackend(): Promise<RtspResponse> {
+  const response = await fetch(`${backendUrl}/customer-flow/get-rtsp`);
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ message: 'Failed to fetch initial streams, server response not JSON or no details provided' }));
+    throw new Error(errorData.message || `Failed to fetch initial streams. Status: ${response.status}`);
+  }
+  return response.json();
+}
+
+async function updateSourceNameOnBackend(url: string, name: string) {
+  const response = await fetch(`${backendUrl}/customer-flow/set-rtsp-name`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ 
+      rtsp_url: url, 
+      name: name 
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ message: 'Failed to update source name, server response not JSON or no details provided' }));
+    throw new Error(errorData.message || `Failed to update source name. Status: ${response.status}`);
+  }
+  return response.json();
+}
+
 const initialState: AppState = {
   rtspSources: {},
   activeSourceUrl: null,
@@ -98,6 +130,117 @@ export const useAppStore = create<AppState & AppActions>()(
   persist(
     immer((set, get) => ({
       ...initialState,
+
+      initializeStreamsOnLogin: async () => {
+        set(state => {
+          state.globalStatus = 'loading_file'; 
+          state.globalErrorMessage = null;
+          state.rtspSources = {}; // Clear existing sources on new login load
+          state.activeSourceUrl = null;
+          state.annotationMode = 'idle';
+        });
+
+        try {
+          const response = await fetchInitialStreamsFromBackend();
+          
+          if (response.ret !== 0 || !response.HandleRTSPData) {
+            throw new Error('Backend error or invalid data for initial streams.');
+          }
+
+          const newRtspSources: Record<string, RtspSourceInfo> = {};
+          const loadedUrls: string[] = [];
+
+          for (const rtspUrlKey in response.HandleRTSPData) {
+            const streamData = response.HandleRTSPData[rtspUrlKey];
+
+            let mjpegStreamUrlForState: string | null = null;
+            let rawMjpegStreamUrlForState: string | null = null;
+            const backendProcessedMjpeg = streamData.mjpeg_url;
+            const backendRawMjpeg = streamData.mjpeg_stream;
+
+            if (backendProcessedMjpeg && backendProcessedMjpeg.trim() !== "") {
+              mjpegStreamUrlForState = `${backendUrl}${backendProcessedMjpeg}`;
+              if (backendRawMjpeg && backendRawMjpeg.trim() !== "") {
+                rawMjpegStreamUrlForState = `${backendUrl}${backendRawMjpeg}`;
+              }
+            } else if (backendRawMjpeg && backendRawMjpeg.trim() !== "") {
+              mjpegStreamUrlForState = `${backendUrl}${backendRawMjpeg}`;
+              // rawMjpegStreamUrlForState remains null as the raw stream is now the primary
+            } else {
+              // Filter out rule: if neither mjpeg_url nor mjpeg_stream is available, filter out.
+              console.warn(`Stream ${streamData.rtsp_url} filtered out: no usable MJPEG stream URL.`);
+              continue; 
+            }
+            
+            // If no frame_url, and no mjpegStream (already filtered above), what to do?
+            // The logic above ensures mjpegStreamUrlForState is set if we proceed.
+
+            const newSourceInfo: RtspSourceInfo = {
+              url: streamData.rtsp_url,
+              name: (streamData.name && streamData.name.trim() !== "") ? streamData.name : streamData.rtsp_url,
+              firstFrameDataUrl: streamData.frame_url ? `${backendUrl}${streamData.frame_url}` : null,
+              annotation: { points: [], isClosed: false, selectedLineIndices: [], zoneType: null },
+              mjpegStreamUrl: mjpegStreamUrlForState, // This will be set if not filtered
+              rawMjpegStreamUrl: rawMjpegStreamUrlForState,
+              // If mjpegStreamUrlForState is set, it means we have a stream to show, status 'streaming'.
+              // If only firstFrameDataUrl is set (no mjpeg), status 'frame_loaded'.
+              // Otherwise 'idle'.
+              status: mjpegStreamUrlForState ? 'streaming' : (streamData.frame_url ? 'frame_loaded' : 'idle'),
+              errorMessage: null,
+              imageDimensions: undefined, // To be populated by _fetchFirstFrame or similar if needed
+            };
+            newRtspSources[streamData.rtsp_url] = newSourceInfo;
+            loadedUrls.push(streamData.rtsp_url);
+          }
+
+          set(state => {
+            state.rtspSources = newRtspSources;
+            if (loadedUrls.length > 0) {
+              state.activeSourceUrl = loadedUrls[0];
+              const activeSource = state.rtspSources[loadedUrls[0]];
+              if (activeSource) {
+                // Match logic from setActiveSource and setSourceFrame for consistency
+                if (activeSource.status === 'frame_loaded' || 
+                    activeSource.status === 'annotating' || 
+                    activeSource.status === 'annotated' ||
+                    (activeSource.status === 'streaming' && activeSource.firstFrameDataUrl) // Allow annotation if streaming with frame
+                   ) {
+                  state.annotationMode = activeSource.annotation.isClosed ? 'line_selection' : 'drawing';
+                } else {
+                  state.annotationMode = 'idle';
+                }
+              } else {
+                state.annotationMode = 'idle';
+              }
+            } else {
+              state.activeSourceUrl = null;
+              state.annotationMode = 'idle';
+              state.globalErrorMessage = "No RTSP streams were loaded from the backend.";
+            }
+            state.globalStatus = 'idle';
+          });
+
+        } catch (error: any) {
+          console.error('Error initializing RTSP streams on login:', error);
+          set(state => {
+            state.globalStatus = 'error';
+            state.globalErrorMessage = error.message || 'Failed to load initial RTSP streams.';
+            // state.rtspSources is already cleared at the beginning of the action
+            // state.activeSourceUrl and state.annotationMode are also reset
+          });
+        }
+      },
+
+      setSourceName: async (url: string, name: string) => {
+        await updateSourceNameOnBackend(url, name);
+
+        set(state => {
+          const source = state.rtspSources[url];
+          if (source) {
+            source.name = name;
+          }
+        });
+      },
 
       addRtspSources: async (urls) => {
         const uniqueUrls = urls.filter(url => url.trim() && !get().rtspSources[url]);

@@ -3,6 +3,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Breadcrumbs } from "@/components/app-header";
 import { auth } from "@/app/(auth)/auth";
 //import { SyncStateToBackend, LoadStateFromBackend } from "@/components/persist-in-backend";
+import InitRtspClient from "@/app/(home)/InitRtspClient";
 
 export default async function HomeLayout({
   children,
@@ -10,6 +11,7 @@ export default async function HomeLayout({
   children: React.ReactNode;
 }>) {
   const session = await auth();
+
   const customBreadcrumbNames = {
     'annotation': "标注与分析",
     'video-preview': "视频预览",
@@ -19,6 +21,7 @@ export default async function HomeLayout({
   return (
     <>
       {/* <LoadStateFromBackend userId={session?.user?.id} /> */}
+      <InitRtspClient />
       <SidebarProvider defaultOpen={true}>
         <AppSidebar />
         <SidebarInset>

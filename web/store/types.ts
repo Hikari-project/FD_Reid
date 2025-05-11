@@ -39,6 +39,22 @@ export interface RtspSourceInfo {
   imageDimensions?: { width: number; height: number };
 }
 
+export interface initialRtspStreamInfo {
+  rtsp_url: string;       // 原始 RTSP 地址
+  frame_url: string;      // 抓帧图像地址
+  mjpeg_stream: string;   // 原始 MJPEG 流地址
+  mjpeg_url: string;      // 已处理 MJPEG 流地址
+  name: string;           // 别名，可为空
+  create_time: string;    // 创建时间，ISO 或日期字符串
+}
+
+export interface RtspResponse {
+  ret: number;
+  HandleRTSPData: {
+    [rtspUrl: string]: initialRtspStreamInfo;
+  };
+}
+
 export type AnnotationMode = 'drawing' | 'line_selection' | 'idle';
 
 export interface AppState {
@@ -50,6 +66,7 @@ export interface AppState {
 }
 
 export interface AppActions {
+  initializeStreamsOnLogin: () => Promise<void>;
   addRtspSources: (urls: string[]) => Promise<void>;
   _fetchFirstFrame: (url: string) => Promise<void>;
   setSourceFrame: (
@@ -62,6 +79,7 @@ export interface AppActions {
   removeRtspSource: (url: string) => void;
   setActiveSource: (url: string | null) => void;
   resetSourceStatus: (url: string) => void;
+  setSourceName: (url: string, name: string) => Promise<void>;
 
   // --- Annotation ---
   setAnnotationMode: (mode: AnnotationMode) => void;

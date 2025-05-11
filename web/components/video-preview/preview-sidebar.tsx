@@ -21,7 +21,7 @@ const PreviewSidebar = () => {
         {sources.map((source) => (
           <li key={source.url} className="flex items-center py-1.5 px-2 rounded hover:bg-gray-100 cursor-default">
             <Camera className="h-5 w-5 mr-2.5 text-gray-500" />
-            <span className="text-sm text-gray-800">视频</span>
+            <span className="text-sm text-gray-800">{source.name || source.url}</span>
           </li>
         ))}
       </ul>

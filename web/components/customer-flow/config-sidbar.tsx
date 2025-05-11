@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
 import { backendUrl, useAppStore } from '@/store/useCustomerAnalysis';
 import type { SourceStatus } from '@/store/types';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,8 @@ import {
   DialogDescription,
   DialogFooter
 } from '../ui/dialog';
+import { EditIcon } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 
 const getStatusBadgeClass = (status: SourceStatus): string => {
   switch (status) {
@@ -56,10 +58,17 @@ export default function ConfigSidebar() {
   
   const setActiveSource = useAppStore(state => state.setActiveSource);
   const removeRtspSource = useAppStore(state => state.removeRtspSource);
+  const setSourceName = useAppStore(state => state.setSourceName);
 
   // 添加状态管理删除确认对话框
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [sourceToDelete, setSourceToDelete] = useState<string | null>(null);
+
+  // Edit name dialog state
+  const [isEditNameDialogOpen, setIsEditNameDialogOpen] = useState(false);
+  const [sourceToEditUrl, setSourceToEditUrl] = useState<string | null>(null);
+  const [newSourceName, setNewSourceName] = useState<string>('');
+  const [currentSourceName, setCurrentSourceName] = useState<string>('');
 
   const handleSelectSource = (url: string) => {
     setActiveSource(url);
@@ -99,6 +108,41 @@ export default function ConfigSidebar() {
     setIsDeleteDialogOpen(false);
   };
 
+  const handleEditSource = (e: React.MouseEvent, url: string) => {
+    e.stopPropagation();
+    const source = sourcesObject[url];
+    if (source) {
+      setSourceToEditUrl(url);
+      const currentName = source.name || source.url;
+      setNewSourceName(currentName);
+      setCurrentSourceName(currentName);
+      setIsEditNameDialogOpen(true);
+    }
+  };
+
+  const handleConfirmEditName = async () => {
+    if (sourceToEditUrl && newSourceName.trim()) {
+      try {
+        await setSourceName(sourceToEditUrl, newSourceName.trim());
+        toast.success(`源名称已更新为 "${newSourceName.trim()}"`);
+        setIsEditNameDialogOpen(false);
+        setSourceToEditUrl(null);
+        setNewSourceName('');
+      } catch (error: any) {
+        console.error("Error updating source name:", error);
+        toast.error(`更新名称失败: ${error.message || '未知错误'}`);
+      }
+    } else if (newSourceName.trim() === '') {
+        toast.warning("名称不能为空。");
+    }
+  };
+
+  const cancelEditName = () => {
+    setIsEditNameDialogOpen(false);
+    setSourceToEditUrl(null);
+    setNewSourceName('');
+  };
+
   return (
     <div className="w-72 h-[calc(100dvh-12.5rem)] bg-white rounded-md shadow-sm pt-4 flex flex-col">
       <div className='flex justify-between items-center'>
@@ -130,7 +174,7 @@ export default function ConfigSidebar() {
             >
               <div className="flex justify-between items-start mb-2">
                 <div className="truncate text-sm font-medium text-gray-800 pr-2 break-all" title={source.url}>
-                  {source.url}
+                  {source.name || source.url}
                 </div>
                 <Button
                   variant="ghost"
@@ -155,6 +199,14 @@ export default function ConfigSidebar() {
                         错误
                      </span>
                     }
+                    <Button 
+                      variant="ghost" size="sm" 
+                      className="h-6 w-6 p-0 text-gray-400 hover:text-red-600 flex-shrink-0 cursor-pointer"
+                      onClick={(e) => handleEditSource(e, source.url)}
+                      title="Edit Source Name"
+                    >
+                      <EditIcon className="w-4 h-4" />
+                    </Button>
               </div>
 
               {source.firstFrameDataUrl && !source.status.startsWith('error') && (
@@ -199,6 +251,38 @@ export default function ConfigSidebar() {
             </Button>
             <Button type="button" variant="destructive" onClick={confirmDelete}>
               删除
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Name Dialog */}
+      <Dialog open={isEditNameDialogOpen} onOpenChange={setIsEditNameDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>编辑源名称</DialogTitle>
+            <DialogDescription>
+              为 RTSP 源 <span className="font-semibold break-all">{currentSourceName}</span> 设置一个新的名称。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Input
+              value={newSourceName}
+              onChange={(e) => setNewSourceName(e.target.value)}
+              placeholder="输入新的名称"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleConfirmEditName();
+                }
+              }}
+            />
+          </div>
+          <DialogFooter className="flex space-x-2 sm:justify-end">
+            <Button type="button" variant="outline" onClick={cancelEditName}>
+              取消
+            </Button>
+            <Button type="button" onClick={handleConfirmEditName}>
+              确认
             </Button>
           </DialogFooter>
         </DialogContent>
