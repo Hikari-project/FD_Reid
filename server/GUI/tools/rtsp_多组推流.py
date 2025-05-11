@@ -22,7 +22,7 @@ def rtsp_out(video_list):
             "-i",
             video_path,
             "-o",
-            f"rtsp://127.0.0.1:8554/test_{i + 1}",
+            f"rtsp://192.168.21.161:8554/test_{i + 1}",
             "--loop"
         ]
 
