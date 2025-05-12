@@ -12,7 +12,6 @@ import sys
 import subprocess
 import time
 
-
 def rtsp_out(video_list):
     processes = []
     for i, video_path in enumerate(video_list):

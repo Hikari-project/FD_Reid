@@ -14,7 +14,8 @@ import uvicorn
 
 
 from main_ReIDTrackerV2 import StreamManager
-
+from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException
 from contextlib import asynccontextmanager
 import os
 import threading
@@ -27,6 +28,21 @@ from fastapi.middleware.cors import CORSMiddleware
 # 自定义的类
 from base_models import RTSP,VideoConfig
 from RTSPData import RTSPData
+
+from fastapi import FastAPI
+from logs_server.db.database import engine
+from logs_server.models.log import Log
+from logs_server.api.log_routes import router as logs_router
+from logs_server.db.database import get_db
+from logs_server.schemas.log import LogCreate
+import logs_server.crud  as crud
+
+
+Log.metadata.create_all(bind=engine)
+
+
+
+
 
 @asynccontextmanager
 async def lifespan(app:FastAPI):
@@ -53,6 +69,9 @@ async def lifespan(app:FastAPI):
     #app.state.stream_manager.cleanup()
 
 app = FastAPI(lifespan=lifespan)
+app.include_router(logs_router)# 插入日志模块
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
@@ -91,7 +110,7 @@ def rtsp_generate_mjpeg(rtsp_url):
     cap.release()
 from RTSPData import HandleRTSPData
 @app.post('/customer-flow/check-rtsp')
-async def check_rtsp(rtsp:RTSP):
+async def check_rtsp(rtsp:RTSP,db:Session=Depends(get_db)):
     # 实例化rtsp对象
     rtsp_data=RTSPData(rtsp.rtsp_url)
 
@@ -120,6 +139,17 @@ async def check_rtsp(rtsp:RTSP):
     # 存储已处理信息
     hanle_rtsp_data=HandleRTSPData(rtsp_url=rtsp.rtsp_url,frame_url=f"/static/frames/{rtsp_data.stream_id}.jpg",mjpeg_stream=f"/customer-flow/video-stream/{rtsp_data.stream_id}",name=rtsp_data.name)
     app.state.handleRTSPData[rtsp.rtsp_url]=hanle_rtsp_data
+
+    # 记录开始日志
+
+    start_log = LogCreate(
+        operator_module="客流分析",
+        operator_type="RTSP流检测",
+        person_name="admin",
+        describes=f"开始检测RTSP流: {rtsp.rtsp_url}"
+    )
+    crud.create_log(db, start_log)
+
     return {
         "status": "success",
         "frame_id": rtsp_data.stream_id,

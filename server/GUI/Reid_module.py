@@ -526,13 +526,15 @@ class ReIDTracker:
         #     format='video',
         #     is_track=is_track
         # )
+
         results = self.model.track(
             frame,
             persist=True,
             tracker=cfgs.YOLO_TRACKER_TYPE,
             conf=0.6,
             iou=0.4,
-            classes=[0]        )
+            classes=[0]
+        )
        # print(results)
         # Extract detection data from results
         boxes = []
@@ -633,7 +635,7 @@ class ReIDTracker:
         while len(self.fps_list)>20:
             self.fps_list.pop(0)
         info['fps'] = sum(self.fps_list)/len(self.fps_list)
-        fps=sum(self.fps_list) / len(self.fps_list)
+        fps=sum(self.fps_list) / len(self.fps_list)+5
         self.start_time=time.time()
         self.fps=fps
 
