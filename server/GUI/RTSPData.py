@@ -20,16 +20,22 @@ class RTSPData:
     """
     RTSPData RTSP流数据实例化
     """
-    def __init__(self ,rtsp_url,max_num=3,name=''):
+    def __init__(self ,rtsp_url,max_num=10,name=''):
+
         # 创建链接
         self.cap=cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
-        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 3)  # 设置缓冲区大小
-
+        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 5)  # 设置缓冲区大小
         self.rtsp_url=rtsp_url
         self.stream_id=str(uuid.uuid4()) # rtsp流的指代ip
 
+        # 是否需要图片
+        self.is_need_screen_img = False  # 是否需要图片，后面分析的时候会为True,然后拿取分析的时候的第一帧
         self.screen_img = self._get_screen_frame()
+        self.screen_img_path = f'static/frames/{self.stream_id}.jpg'
         self.height,self.width=self.screen_img.shape[:2]
+
+
+
 
         self.stop_event = threading.Event()
         # 启动rtsp自动解码线程
@@ -44,7 +50,17 @@ class RTSPData:
         # self.process_frame_queue=queue.Queue(maxsize=max_num)
         self.process_frame_queue=asyncio.Queue(maxsize=max_num)
 
-
+        # 是否更新resize
+        self.is_resize = False
+        # 如果画面大于1920则进行resize
+        self.min_width_px = 1280
+        if self.width > self.min_width_px:
+            new_h = self.height * self.min_width_px // self.width
+            self.screen_img = cv2.resize(self.screen_img, (self.min_width_px, new_h))
+            self.width, self.height = self.min_width_px, new_h
+            print(self.height, self.width)
+            print(self.min_width_px, new_h)
+            self.is_resize = True
 
 
     def _get_screen_frame(self):
@@ -54,6 +70,7 @@ class RTSPData:
         # 捕获首帧
         max_attempts = 100
         for i in range(max_attempts):
+
             ret, frame = self.cap.read()
             if ret and frame is not None and frame.size != 0:
                 if is_img_not_valid(frame):
@@ -61,6 +78,7 @@ class RTSPData:
                 else:
                     print('发现未损坏图片', str(i))
                     valid_frame = frame
+
                     break
             cv2.waitKey(1)
         return valid_frame
@@ -80,6 +98,8 @@ class RTSPData:
                         #asyncio.run_coroutine_threadsafe(self.origin_frame_queue.put(frame),self.mainloop)
                        # await self.origin_frame_queue.put(frame, block=False)
                        # print(f'rtsp:{self.rtsp_url} 压入一个frame，当前大小：{self.origin_frame_queue.qsize()}')
+                        if self.is_resize:
+                            frame = cv2.resize(frame, (self.width, self.height))
                         self.origin_frame_queue.put(frame, block=False)
 
                     except queue.Full:
@@ -101,6 +121,8 @@ class RTSPData:
     async def _async_put_frame(self, frame):
         """异步队列写入方法"""
         try:
+            if self.is_resize:
+                frame = cv2.resize(frame, (self.width, self.height))
             await self.origin_frame_queue.put(frame)
             print(f"成功写入队列，当前大小: {self.origin_frame_queue.qsize()}")
         except asyncio.QueueFull:

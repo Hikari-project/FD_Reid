@@ -49,7 +49,7 @@ import argparse
 
 from datetime import datetime
 
-
+fps_show=True
 
 # 添加自定义JSON编码器
 class NumpyEncoder(json.JSONEncoder):
@@ -641,19 +641,9 @@ class ReIDTracker:
 
         # 绘制ROI区域 取消绘制roi
         self._draw_rois(output_frame, self.json_data)
+        self._draw_text_info(output_frame)
 
-        # 在处理后的图片上显示信息
-        cv2.putText(output_frame, f'FPS:{fps:.2f}', (30, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
 
-        # 显示计数信息
-        counts = self.log_system.get_counts()
-        cv2.putText(output_frame, f"Enter: {counts['enter']+counts['re_enter']}", (30, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-        cv2.putText(output_frame, f"Exit: {counts['exit']}", (30, 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-        cv2.putText(output_frame, f"Pass: {counts['pass']}", (30, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-        cv2.putText(output_frame, f"Re_enter: {counts['re_enter']}", (30, 270), cv2.FONT_HERSHEY_SIMPLEX, 1,
-                    (0, 255, 0), 2)
-        cv2.putText(output_frame, f"Area: {len(self.current_in_roi)}", (30, 210), cv2.FONT_HERSHEY_SIMPLEX, 1,
-                    (0, 255, 0), 2)
 
 
         # 保存视频
@@ -665,8 +655,55 @@ class ReIDTracker:
             self._cleanup_old_data()
             self.last_cleanup_time = current_time
 
+
+        counts = self.log_system.get_counts()
         info['counts'] = counts
         return output_frame, info
+    def _draw_text_info(self,frame):
+        counts = self.log_system.get_counts()
+        height, width = frame.shape[:2]
+        # 需要显示的信息列表（文本内容，颜色，是否FPS）
+
+        # 循环绘制每个文本
+        info_texts = []
+        if fps_show:
+            info_texts.append((f'FPS:{self.fps:.2f}', (255, 0, 0)))  # 蓝色
+
+        info_texts += [
+            (f"Enter: {counts['enter'] + counts['re_enter']}", (0, 255, 0)),
+            (f"Exit: {counts['exit']}", (0, 255, 0)),
+            (f"Pass: {counts['pass']}", (0, 255, 0)),
+            (f"Re_enter: {counts['re_enter']}", (0, 255, 0))
+        ]
+
+
+        if not fps_show:
+            del info_texts[0]
+        # 显示参数
+        y_start = 30  # 起始Y坐标
+        y_increment = 40  # 行间距
+        right_margin = 30  # 右侧边距
+        maxx = 10000
+
+
+
+        for i, (text, color) in enumerate(info_texts):
+            # 计算文本尺寸
+            (text_width, text_height), baseline = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 1, 2)
+
+            # 计算坐标（右对齐）
+            x = width - text_width - right_margin
+            maxx = min(maxx, x)
+
+        for i, (text, color) in enumerate(info_texts):
+            y = y_start + i * y_increment
+
+            # 绘制文本
+            cv2.putText(frame, text, (maxx, y + 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
+        return frame
+
+
     def draw_origin_image(self,frame):
         """给原始画面绘图"""
         # 绘制框框
@@ -676,22 +713,7 @@ class ReIDTracker:
         # 绘制ROI区域 取消绘制roi
         self._draw_rois(frame, self.json_data)
 
-        # 在处理后的图片上显示信息
-        cv2.putText(frame, f'FPS:{self.fps:.2f}', (30, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
-
-
-        # 绘制左上角的信息
-        counts = self.log_system.get_counts()
-        cv2.putText(frame, f"Enter: {counts['enter'] + counts['re_enter']}", (30, 30), cv2.FONT_HERSHEY_SIMPLEX,
-                    1, (0, 255, 0), 2)
-        cv2.putText(frame, f"Exit: {counts['exit']}", (30, 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-        cv2.putText(frame, f"Pass: {counts['pass']}", (30, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-        cv2.putText(frame, f"Re_enter: {counts['re_enter']}", (30, 270), cv2.FONT_HERSHEY_SIMPLEX, 1,
-                    (0, 255, 0), 2)
-        cv2.putText(frame, f"Area: {len(self.current_in_roi)}", (30, 210), cv2.FONT_HERSHEY_SIMPLEX, 1,
-                    (0, 255, 0), 2)
-
-
+        self._draw_text_info(frame)
 
         return frame
 

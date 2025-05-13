@@ -140,8 +140,8 @@ async def check_rtsp(rtsp:RTSP,db:Session=Depends(get_db)):
     hanle_rtsp_data=HandleRTSPData(rtsp_url=rtsp.rtsp_url,frame_url=f"/static/frames/{rtsp_data.stream_id}.jpg",mjpeg_stream=f"/customer-flow/video-stream/{rtsp_data.stream_id}",name=rtsp_data.name)
     app.state.handleRTSPData[rtsp.rtsp_url]=hanle_rtsp_data
 
-    # 记录开始日志
 
+    # 记录开始日志
     start_log = LogCreate(
         operator_module="客流分析",
         operator_type="RTSP流检测",
