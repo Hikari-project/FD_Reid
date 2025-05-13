@@ -20,10 +20,10 @@ class RTSPData:
     """
     RTSPData RTSP流数据实例化
     """
-    def __init__(self ,rtsp_url,max_num=3,name=''):
+    def __init__(self ,rtsp_url,max_num=10,name=''):
         # 创建链接
         self.cap=cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
-        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 3)  # 设置缓冲区大小
+        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 5)  # 设置缓冲区大小
 
         self.rtsp_url=rtsp_url
         self.stream_id=str(uuid.uuid4()) # rtsp流的指代ip

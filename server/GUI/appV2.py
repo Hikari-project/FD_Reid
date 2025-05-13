@@ -183,6 +183,8 @@ async def video_feed(stream_id):
         app.state.stream_manager.consume_frame(rtsp_url),
         media_type='multipart/x-mixed-replace; boundary=frame'
     )
+
+
 @app.post('/customer-flow/custome-analysisV2')
 async def custome_analysisV2(video_config:VideoConfig):
     # 获取传入的视频
