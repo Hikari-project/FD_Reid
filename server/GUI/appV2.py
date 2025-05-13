@@ -200,7 +200,7 @@ async def custome_analysisV2(video_config:VideoConfig):
     #app.state.rtsp_datas[rtsp_url]
 
     # 启动处理线程 ，存储处理线程的信息,队列信息
-    app.state.video_thread_info[rtsp_data.stream_id] = app.state.stream_manager.process_video_in_thread(config[0]['rtsp_url'],config[0])
+    app.state.video_thread_info[rtsp_data.stream_id] =await app.state.stream_manager.process_video_in_thread(config[0]['rtsp_url'],config[0])
 
     # 存储rtsp流信息
     app.state.handleRTSPData[config[0]['rtsp_url']].mjpeg_url=mjpeg_list[0]['mjpeg_url']

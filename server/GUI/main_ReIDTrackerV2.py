@@ -279,7 +279,7 @@ class StreamManager:
 
 
 
-    def process_video_in_thread(self, video_source, temp_data={},
+    async def process_video_in_thread(self, video_source, temp_data={},
                                 skip_frames=2, match_thresh=0.15, is_track=True, save_video=False,
                                 stream_manager=None, show_window=True, window_name=None, queue_index=0):
         """
@@ -395,7 +395,7 @@ class StreamManager:
                     # 将处理后的帧放入队列
                     if processed_frame is not None:
                         try:
-                            print('process:',str(current_rtsp_data.process_frame_queue.qsize()))
+                            print(f'{current_rtsp_data.rtsp_url} process:',str(current_rtsp_data.process_frame_queue.qsize()))
                             # await current_rtsp_data.process_frame_queue.put(processed_frame)
 
                             await asyncio.wrap_future(

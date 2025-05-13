@@ -79,6 +79,7 @@ class RTSPData:
 
                         #asyncio.run_coroutine_threadsafe(self.origin_frame_queue.put(frame),self.mainloop)
                        # await self.origin_frame_queue.put(frame, block=False)
+                       # print(f'rtsp:{self.rtsp_url} 压入一个frame，当前大小：{self.origin_frame_queue.qsize()}')
                         self.origin_frame_queue.put(frame, block=False)
 
                     except queue.Full:
