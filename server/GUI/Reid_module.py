@@ -202,11 +202,18 @@ class ReIDTracker:
         return b1, b2, b3, points
 
     def _setup_area_boundaries(self, json_data):
-        """设置区域边界"""
-        self.rect_points = [(point[0], point[1]) for point in json_data["points"]]
-
-        # 创建shapely Polygon对象用于区域检测
+        """设置区域边界和ROI矩形区域"""
+        # 从JSON数据中提取矩形点列表
+        self.rect_points = [tuple(p) for p in json_data['points']]
         self.area_polygon = Polygon(self.rect_points)
+
+        # 定义矩形ROI区域
+        # 检查json_data中是否包含roi_rectangle
+        if 'roi_rectangle' in json_data and len(json_data['roi_rectangle']) == 4:
+            self.roi_rectangle = json_data['roi_rectangle']
+        else:
+            # 默认值：设置在画面中间区域的蓝色矩形
+            self.roi_rectangle = [250, 70, 850, 570]  # [x1, y1, x2, y2] - 设置为画面中间位置
 
         # 定义进店线(点0到点1)
         self.entry_line = LineString([self.rect_points[0], self.rect_points[1]])
@@ -220,19 +227,31 @@ class ReIDTracker:
             self.side_lines.append(LineString([self.rect_points[i], next_point]))
 
     def _draw_rois(self, frame, json_data):
-        """绘制门店前部区域"""
+        """绘制门店前部区域和矩形ROI区域"""
         # 从一维数组转换为元组对格式
-        b3 = [tuple(p) for p in json_data['b1']]  # [(x1,y1), (x2,y2)]
-        b2 = [tuple(p) for p in json_data['b2']]
-        b1 = [tuple(p) for p in json_data['g2']]  # g2作为b3
+        # 降低原区域的显示透明度，使其更加淡化
         points = np.array(json_data['points'], np.int32).reshape((-1, 1, 2))
         overlay = frame.copy()
         cv2.fillPoly(overlay, [points], color=(128, 128, 128))
-
-        alpha = 0.5
+        
+        # 原始区域使用很低的透明度，几乎不可见
+        alpha = 0.1  # 降低原区域的透明度，使其更加淡化
         cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
-
-        cv2.line(frame, b3[0], b3[1], (255, 0, 0), 2)  # B3
+        
+        # 不再绘制原始的B3线条
+        # b3 = [tuple(p) for p in json_data['b1']]  # [(x1,y1), (x2,y2)]
+        # cv2.line(frame, b3[0], b3[1], (255, 0, 0), 2)  # B3
+        
+        # 绘制矩形ROI区域（蓝色线条）- 这是用户关注的主要区域
+        if hasattr(self, 'roi_rectangle') and self.roi_rectangle is not None:
+            x1, y1, x2, y2 = self.roi_rectangle
+            # 绘制蓝色矩形框 - 使用稍粗的线条使其更加明显
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 3)  # 蓝色，线条加粗
+            
+            # 给ROI区域添加淡蓝色半透明填充
+            roi_overlay = frame.copy()
+            cv2.rectangle(roi_overlay, (x1, y1), (x2, y2), (255, 165, 0), -1)  # 填充矩形
+            cv2.addWeighted(roi_overlay, 0.15, frame, 0.85, 0, frame)  # 叠加到原图像
 
     def _draw_match(self, image, boxes, labels, confs):
         """绘制匹配框和置信度"""
@@ -468,38 +487,28 @@ class ReIDTracker:
 
     def process_frame(self, frame=None, skip_frames=2, match_thresh=0.15, is_track=True):
         """
-        处理单帧图像
+        处理单帧图像，进行人员检测、跟踪和ReID
 
         参数:
-            frame: 要处理的帧，如果为None则从已打开的视频源读取
-            skip_frames: 跳帧数
-            match_thresh: 匹配阈值
+            frame: 输入帧
+            skip_frames: 跳帧数，每隔skip_frames帧处理一帧
+            match_thresh: ReID匹配阈值
             is_track: 是否进行跟踪
 
         返回:
             output_frame: 处理后的帧
-            info: 包含当前帧处理信息的字典
+            info: 包含各种处理信息的字典
         """
-        # 如果没有提供帧且有视频源，则从视频源读取
+        # 初始化
         if frame is None:
-            if not hasattr(self, 'cap') or self.cap is None:
-                print("错误: 未初始化视频源，请先调用setup_processing并提供视频路径")
-                return None, {'error': 'No video source initialized'}
+            return None, {}
 
-            ret, frame = self.cap.read()
-            if not ret:
-                return None, {'error': 'End of video'}
+        # 记录当前时间
+        if not hasattr(self, 'start_time'):
+            self.start_time = time.time()
 
-        # 确保已经设置了处理环境
-        if not hasattr(self, 'id_dict') or self.id_dict is None:
-            print("错误: 未初始化处理环境，请先调用setup_processing")
-            return None, {'error': 'Processing environment not initialized'}
-
-        # 开始计时
-        start_time = time.time()
-        # self.frame_count += 1
-        # if self.frame_count > 1000000:  # 百万帧后重置
-        #     self.frame_count = 0
+        # 增加帧计数
+        self.frame_count += 1
         # 准备返回信息
         info = {
             'tracks': [],
@@ -513,20 +522,7 @@ class ReIDTracker:
         # 清除当前帧的ROI内ID集合
         self.current_in_roi = set()
 
-        # 检查行人数量是否变化
-        # current_person_count = get_max_person_id(self.db_path)
-        # if self.pre != current_person_count:
-        #     print('当前行人库中的行人数量：', current_person_count)
-        #     self.pre = current_person_count
-
         # 目标检测和跟踪
-        # boxes, track_ids, labels, confs = self.reid_pipeline.detect(
-        #     frame,
-        #     class_idx_list=self.reid_pipeline._target_class_idx_list,
-        #     format='video',
-        #     is_track=is_track
-        # )
-
         results = self.model.track(
             frame,
             persist=True,
@@ -535,7 +531,7 @@ class ReIDTracker:
             iou=0.4,
             classes=[0]
         )
-       # print(results)
+        
         # Extract detection data from results
         boxes = []
         track_ids = []
@@ -553,6 +549,7 @@ class ReIDTracker:
                     track_ids = result.boxes.id.int().cpu().numpy()  # Get track IDs
                 else:
                     track_ids = np.arange(len(boxes))  # Fallback if tracking IDs not available
+                
         # 更新跟踪
         self.track_manager.update_tracks(track_ids if track_ids is not None else [])
 
@@ -560,11 +557,20 @@ class ReIDTracker:
 
         # 如果启用了跟踪
         if is_track and track_ids is not None and len(track_ids) > 0:
+            # 获取ROI矩形区域
+            roi_x1, roi_y1, roi_x2, roi_y2 = self.roi_rectangle
+            
             for bbox, track_id, conf in zip(boxes, track_ids, confs):
-                # 质量检测
-                # if bbox[3] - bbox[1] < 50 or bbox[2] - bbox[0] < 50 or conf < 0.5:
-                #     continue
-
+                # 创建当前点坐标
+                x_center, y_center = self._get_box_center(bbox)
+                
+                # 检查是否在ROI矩形区域内
+                in_roi_rectangle = (roi_x1 <= x_center <= roi_x2) and (roi_y1 <= y_center <= roi_y2)
+                
+                # 仅处理ROI矩形区域内的目标
+                if not in_roi_rectangle:
+                    continue
+                
                 # 获取ROI
                 x1, y1, x2, y2 = map(int, bbox)
                 roi_frame = frame[y1:y2, x1:x2].copy()
@@ -574,8 +580,6 @@ class ReIDTracker:
                 self.track_manager.update_track_info(track_id, quality=quality_score)
                 track_info = self.track_manager.get_track_info(track_id)
 
-                # 创建当前点坐标
-                x_center, y_center = self._get_box_center(bbox)
                 curr_point = Point(x_center, y_center)
 
                 # 检查点是否在区域内
@@ -615,21 +619,22 @@ class ReIDTracker:
                     'box': bbox,
                     'conf': conf,
                     'position': (x_center, y_center),
-                    'in_area': curr_in_area
+                    'in_area': curr_in_area,
+                    'in_roi_rectangle': in_roi_rectangle
                 })
+            
             self.had_search_trackid_list=had_search_trackid_list
             output_frame = self._draw_match(frame.copy(),
                                             [row[0] for row in had_search_trackid_list],  # boxes
                                             [row[1] for row in had_search_trackid_list],  # labels(id,status)
                                             [row[2] for row in had_search_trackid_list])  # confs
             self.pre_data=[[row[0] for row in had_search_trackid_list],  # boxes
-                                            [row[1] for row in had_search_trackid_list],  # labels(id,status)
-                                            [row[2] for row in had_search_trackid_list]]
+                                    [row[1] for row in had_search_trackid_list],  # labels(id,status)
+                                    [row[2] for row in had_search_trackid_list]]
         else:
             output_frame = frame.copy()
 
         # 计算FPS
-      #  self.end_time = time.time()
         fps_current = 1.0 / (time.time() - self.start_time)
         self.fps_list.append(fps_current)
         while len(self.fps_list)>20:
@@ -654,38 +659,6 @@ class ReIDTracker:
         # cv2.putText(output_frame, f"Pass: {counts['pass']}", (30, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
         # cv2.putText(output_frame, f"Re_enter: {counts['re_enter']}", (30, 270), cv2.FONT_HERSHEY_SIMPLEX, 1,
         #             (0, 255, 0), 2)
-        height, width = output_frame.shape[:2]
-        counts = self.log_system.get_counts()
-        # 需要显示的信息列表（文本内容，颜色，是否FPS）
-        info_texts = [
-            # (f'FPS:{fps:.2f}', (255, 0, 0)),  # 蓝色
-            (f"Enter: {counts['enter'] + counts['re_enter']}", (0, 255, 0)),
-            (f"Exit: {counts['exit']}", (0, 255, 0)),
-            (f"Pass: {counts['pass']}", (0, 255, 0)),
-            (f"Re_enter: {counts['re_enter']}", (0, 255, 0))
-        ]
-
-        # 显示参数
-        y_start = 30  # 起始Y坐标
-        y_increment = 40  # 行间距
-        right_margin = 30  # 右侧边距
-        maxx = 10000
-        # 循环绘制每个文本
-        for i, (text, color) in enumerate(info_texts):
-            # 计算文本尺寸
-            (text_width, text_height), baseline = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 1, 2)
-
-            # 计算坐标（右对齐）
-            x = width - text_width - right_margin
-            maxx = min(maxx, x)
-
-        for i, (text, color) in enumerate(info_texts):
-            y = y_start + i * y_increment
-
-            # 绘制文本
-            cv2.putText(output_frame, text, (maxx, y + 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
-
         # cv2.putText(output_frame, f"Area: {len(self.current_in_roi)}", (30, 210), cv2.FONT_HERSHEY_SIMPLEX, 1,(0, 255, 0), 2)
 
 
@@ -698,7 +671,7 @@ class ReIDTracker:
             self._cleanup_old_data()
             self.last_cleanup_time = current_time
 
-        info['counts'] = counts
+        info['counts'] = self.log_system.get_counts()
         return output_frame, info
     def draw_origin_image(self,frame):
         """给原始画面绘图"""
@@ -1147,6 +1120,22 @@ class ReIDTracker:
         cv2.destroyAllWindows()
         print("资源已释放")
 
+    def set_roi_rectangle(self, x1, y1, x2, y2):
+        """
+        设置ROI矩形区域
+        
+        参数:
+            x1, y1: 左上角坐标
+            x2, y2: 右下角坐标
+        """
+        # 确保x1 < x2, y1 < y2
+        x1, x2 = min(x1, x2), max(x1, x2)
+        y1, y2 = min(y1, y2), max(y1, y2)
+        
+        self.roi_rectangle = [x1, y1, x2, y2]
+        print(f"ROI矩形区域已设置为 [{x1}, {y1}, {x2}, {y2}]")
+        return True
+
 
 
 
@@ -1227,7 +1216,7 @@ if __name__ == "__main__":
         print(f"警告: 配置文件 {config_path} 不存在，将创建默认配置")
         # 创建默认配置
         config = {
-            "b1": [[500, 600], [750, 600]],
+            "b1": [[50, 600], [750, 600]],
             "b2": [[750, 600], [750, 400]],
             "g2": [[750, 400], [500, 400]],
             "points": [[500, 600], [750, 600], [750, 400], [500, 400]]

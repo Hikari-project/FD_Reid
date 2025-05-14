@@ -24,6 +24,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import List
 
 # 自定义的类
 from base_models import RTSP,VideoConfig
@@ -41,7 +43,10 @@ import logs_server.crud  as crud
 Log.metadata.create_all(bind=engine)
 
 
-
+# 添加ROI设置的模型
+class ROIRequest(BaseModel):
+    source_url: str
+    roi: List[int]  # [x1, y1, x2, y2]
 
 
 @asynccontextmanager
@@ -53,7 +58,7 @@ async def lifespan(app:FastAPI):
     app.state.rtsp_datas={}
     app.state.stream_manager = StreamManager(mjpeg_server_port=8554, max_reconnect=10,rtsp_datas=app.state.rtsp_datas)
 
-    # 知道stream_id 返回rtsp_url
+    # 知道stream_id 返回rtsp
     app.state.stream_2_rtsp_dict={}
 
     # 已处理的RTSP流信息
@@ -62,6 +67,10 @@ async def lifespan(app:FastAPI):
 
     # 视频的线程信息
     app.state.video_thread_info={}
+    
+    # 存储ROI设置
+    app.state.roi_settings = {}
+    
     yield
     # 清理资源
     pass
@@ -88,6 +97,85 @@ app.mount(static_path[1:], StaticFiles(directory="static"), name="static")
 stream_objects = {}
 
 
+@app.post('/api/set_roi')
+async def set_roi(roi_request: ROIRequest, db: Session = Depends(get_db)):
+    """
+    设置视频流的ROI（感兴趣区域）
+    
+    参数:
+        roi_request: 包含source_url和roi坐标的请求体
+    
+    返回:
+        设置结果信息
+    """
+    try:
+        source_url = roi_request.source_url
+        roi = roi_request.roi
+        
+        if len(roi) != 4:
+            raise HTTPException(status_code=400, detail="ROI必须包含4个坐标点: [x1, y1, x2, y2]")
+        
+        print(f"收到ROI设置请求: URL={source_url}, ROI={roi}")
+        print(f"视频线程信息: {list(app.state.video_thread_info.keys())}")
+        
+        # 查找视频对应的stream_id
+        stream_id = None
+        for sid, url in app.state.stream_2_rtsp_dict.items():
+            if url == source_url:
+                stream_id = sid
+                break
+        
+        if not stream_id:
+            # 如果找不到，尝试直接使用URL作为key
+            print(f"未找到视频流ID，尝试直接查找: {source_url}")
+            if source_url not in app.state.video_thread_info:
+                # 最后尝试查找所有视频线程，找到第一个
+                if app.state.video_thread_info:
+                    first_key = list(app.state.video_thread_info.keys())[0]
+                    print(f"使用第一个可用线程: {first_key}")
+                    tracker_instance = app.state.video_thread_info[first_key].get('tracker')
+                else:
+                    raise HTTPException(status_code=404, detail=f"未找到任何视频流")
+            else:
+                tracker_instance = app.state.video_thread_info[source_url].get('tracker')
+        else:
+            print(f"找到视频流ID: {stream_id}")
+            if stream_id not in app.state.video_thread_info:
+                raise HTTPException(status_code=404, detail=f"未找到视频流ID: {stream_id}")
+            tracker_instance = app.state.video_thread_info[stream_id].get('tracker')
+        
+        if not tracker_instance:
+            raise HTTPException(status_code=500, detail=f"未找到视频处理实例")
+        
+        # 设置ROI
+        print(f"设置ROI: {roi}")
+        tracker_instance.set_roi_rectangle(roi[0], roi[1], roi[2], roi[3])
+        
+        # 保存ROI设置以便后续使用
+        app.state.roi_settings[source_url] = roi
+        
+        # 记录详细日志
+        print(f"成功设置ROI区域: URL={source_url}, 坐标=[{roi[0]}, {roi[1]}, {roi[2]}, {roi[3]}]")
+        
+        # 记录日志
+        log_entry = LogCreate(
+            operator_module="客流分析",
+            operator_type="设置ROI区域",
+            person_name="admin",
+            describes=f"为视频流 {source_url} 设置ROI区域: {roi}"
+        )
+        crud.create_log(db, log_entry)
+        
+        return {
+            "status": "success",
+            "message": "ROI区域设置成功",
+            "roi": roi
+        }
+    except Exception as e:
+        print(f"设置ROI错误: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"设置ROI失败: {str(e)}")
 
 
 def rtsp_generate_mjpeg(rtsp_url):
@@ -203,6 +291,34 @@ async def custome_analysisV2(video_config:VideoConfig):
 
     # 启动处理线程 ，存储处理线程的信息,队列信息
     app.state.video_thread_info[rtsp_data.stream_id] =await app.state.stream_manager.process_video_in_thread(config[0]['rtsp_url'],config[0])
+    
+    # 检查是否存在预设的ROI设置
+    source_url = config[0]['rtsp_url']
+    if source_url in app.state.roi_settings:
+        # 如果存在预设ROI，自动应用
+        roi = app.state.roi_settings[source_url]
+        tracker_instance = app.state.video_thread_info[rtsp_data.stream_id].get('tracker')
+        if tracker_instance:
+            tracker_instance.set_roi_rectangle(roi[0], roi[1], roi[2], roi[3])
+            print(f"已自动应用预设ROI: {roi} 到视频流: {source_url}")
+    else:
+        # 如果不存在预设ROI，设置默认值在中间位置
+        tracker_instance = app.state.video_thread_info[rtsp_data.stream_id].get('tracker')
+        if tracker_instance:
+            # 获取视频宽高
+            if hasattr(tracker_instance, 'video_width') and hasattr(tracker_instance, 'video_height'):
+                width = tracker_instance.video_width
+                height = tracker_instance.video_height
+                # 计算中间位置的ROI
+                x1 = int(width * 0.2)
+                y1 = int(height * 0.15)
+                x2 = int(width * 0.8)
+                y2 = int(height * 0.85)
+                # 设置ROI
+                tracker_instance.set_roi_rectangle(x1, y1, x2, y2)
+                print(f"已设置默认ROI在中间位置: [{x1}, {y1}, {x2}, {y2}] 到视频流: {source_url}")
+                # 保存ROI设置
+                app.state.roi_settings[source_url] = [x1, y1, x2, y2]
 
     # 存储rtsp流信息
     app.state.handleRTSPData[config[0]['rtsp_url']].mjpeg_url=mjpeg_list[0]['mjpeg_url']
@@ -234,4 +350,4 @@ def set_rtsp_name(rtsp:RTSP):
 #     return {"memory_stats": [str(stat) for stat in top_stats[:5]]}
 
 if __name__ == '__main__':
-    uvicorn.run("appV2:app", host='0.0.0.0', port=3002)
+    uvicorn.run("appV2:app", host='127.0.0.1', port=3002)

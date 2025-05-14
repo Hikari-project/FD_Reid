@@ -298,7 +298,7 @@ class StreamManager:
             queue_index: 处理后的帧放入哪个队列的索引
 
         Returns:
-            thread_info: 包含线程对象、停止事件等信息的字典
+            thread_info: 包含线程对象、停止事件等信息的字典，包括tracker实例
         """
         import threading
         import cv2
@@ -310,6 +310,10 @@ class StreamManager:
 
         asyncio.set_event_loop(current_rtsp_data.mainloop)
         print('...11')
+        
+        # 创建共享的tracker实例引用，以便线程外部可以访问
+        tracker_ref = {'instance': None}
+        
         async def _process_video_task(current_rtsp_data):
             """线程内运行的任务函数"""
 
@@ -318,6 +322,9 @@ class StreamManager:
 
             # 创建跟踪器
             tracker = ReIDTracker(log_system=log_system)
+            # 保存tracker引用以便外部访问
+            tracker_ref['instance'] = tracker
+            
             print("temp_data:", str(temp_data))
             if not tracker.setup_processing(None, temp_data):
                 print(f"无法设置视频处理环境")
@@ -487,17 +494,16 @@ class StreamManager:
         # 创建并启动线程
         thread = threading.Thread(target=_thread_target, daemon=True)
         thread.start()
-        threading_dict={}
+        
+        # 构建线程信息字典，包含tracker实例
+        threading_dict = {
+            "thread": thread,
+            "stop_event": current_rtsp_data.stop_event,
+            "window_name": window_name,
+            "source_url": video_source,
+            "tracker": tracker_ref['instance']  # 初始时可能为None，但线程启动后会被设置
+        }
 
-        # threading_dict={
-        #     "thread": thread,
-        #     "stop_event": stop_event,
-        #     "window_name": window_name,
-        #     "stream_id": stream_id
-        # }
-
-        #self.video_thread_info[queue_index] =threading_dict
-       # self.video_rtsp_dict[video_source]=queue_index
         # 返回包含线程信息的字典
         return threading_dict
 
