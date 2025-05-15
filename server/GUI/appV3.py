@@ -13,7 +13,7 @@ import fastapi
 import uvicorn
 
 
-from main_ReIDTrackerV2 import StreamManager
+from main_ReIDTrackerV3 import StreamManager
 from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, HTTPException
 from contextlib import asynccontextmanager
@@ -40,6 +40,8 @@ import logs_server.log_crud as crud
 
 Log.metadata.create_all(bind=engine)
 
+from ws_manager import ConnectionManager
+from fastapi import FastAPI,WebSocket,WebSocketDisconnect
 
 
 
@@ -62,6 +64,9 @@ async def lifespan(app:FastAPI):
 
     # 视频的线程信息
     app.state.video_thread_info={}
+
+    # wsmanage
+    app.state.ws_manager = ConnectionManager(app.state.rtsp_datas)
     yield
     # 清理资源
     pass
@@ -192,7 +197,6 @@ async def custome_analysisV2(video_config:VideoConfig):
     rtsp_data=app.state.rtsp_datas[config[0]['rtsp_url']]
     print(rtsp_data)
 
-    #
     # index=
     index=0
     mjpeg_list = app.state.stream_manager.setup_streams(config, index, stream_id=rtsp_data.stream_id,show_windows=True)
@@ -231,5 +235,23 @@ def set_rtsp_name(rtsp:RTSP):
 #     top_stats = snapshot.statistics('lineno')
 #     return {"memory_stats": [str(stat) for stat in top_stats[:5]]}
 
+
+@app.websocket("/customer-flow/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    """请求这个rtsp，返回这个rtsp流的处理结果"""
+    rtsp_url = websocket.query_params.get("rtsp_url")
+    if not rtsp_url:
+        await websocket.close(code=1008, reason="RTSP URL required")
+        return
+
+    await app.state.ws_manager.connect(websocket, rtsp_url)
+
+    try:
+        while True:
+            # 保持连接活跃，接收任意消息（可选）
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        await app.state.ws_manager.disconnect(rtsp_url)
+
 if __name__ == '__main__':
-    uvicorn.run("appV2:app", host='0.0.0.0', port=3002)
+    uvicorn.run("appV3:app", host='0.0.0.0', port=3002)

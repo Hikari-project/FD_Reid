@@ -12,8 +12,8 @@ from .db.database import engine
 from .models.log import Log
 from .api.log_routes import router as logs_router
 
-Log.metadata.create_all(bind=engine)
 
+Log.metadata.create_all(bind=engine)
 app = FastAPI()
 app.include_router(logs_router)
 # 跨域
@@ -24,6 +24,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 @app.get("/")
 def root():
     return {"message": "Logging System API"}

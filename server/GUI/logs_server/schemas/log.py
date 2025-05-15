@@ -16,6 +16,9 @@ class LogCreate(BaseModel):
     person_name: str
     describes: str
 
+
+
+
 class LogResponse(LogCreate):
     id: Optional[int]=1
     create_time: Optional[datetime]=None
