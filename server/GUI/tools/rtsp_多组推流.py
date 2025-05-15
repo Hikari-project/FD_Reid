@@ -21,7 +21,7 @@ def rtsp_out(video_list):
             "-i",
             video_path,
             "-o",
-            f"rtsp://192.168.21.161:8554/test_{i + 1}",
+            f"rtsp://192.168.21.150:8554/test_{i + 1}",
             "--loop"
         ]
 
@@ -45,8 +45,8 @@ if __name__ == '__main__':
         # r"H:\fd_project\FD_REID_Project\data\test1.mp4",
         # r"H:\fd_project\FD_REID_Project\data\test2.mp4",
 
-        r"H:\fd_project\FD_REID_Project\data\FD_video_1216\901_20241216_174435.mkv",
-         r"H:\fd_project\FD_REID_Project\data\FD_video_1216\801_20241216_174432.mkv",
+        r"C:\Users\yuand\Videos\1.mp4",
+        # r"C:\Users\yuand\Videos\2.mp4",
     ]
 
     # 启动所有推流任务

@@ -32,11 +32,15 @@ export interface RtspSourceInfo {
   name?: string;
   firstFrameDataUrl: string | null;
   annotation: Annotation;
-  mjpegStreamUrl: string | null; // Processed stream
-  rawMjpegStreamUrl?: string | null; // Raw/original stream
+  mjpegStreamUrl: string | null;
+  rawMjpegStreamUrl: string | null;
   status: SourceStatus;
-  errorMessage?: string | null;
+  errorMessage: string | null;
   imageDimensions?: { width: number; height: number };
+  wsToken?: string;
+  boxes?: BackendBox[];
+  wsStatus?: 'idle' | 'connecting' | 'connected' | 'disconnected' | 'error';
+  wsErrorMessage?: string | null;
 }
 
 export interface initialRtspStreamInfo {
@@ -46,6 +50,7 @@ export interface initialRtspStreamInfo {
   mjpeg_url: string;      // 已处理 MJPEG 流地址
   name: string;           // 别名，可为空
   create_time: string;    // 创建时间，ISO 或日期字符串
+  ws_token?: string;      // Added ws_token here if backend provides it initially
 }
 
 export interface RtspResponse {
@@ -100,7 +105,39 @@ export interface AppActions {
 
   // --- Set State ---
   setState: (state: Partial<AppState>) => void;
+
+  // --- WebSocket ---
+  connectBoxWS: (rtspUrl: string) => void;
+  disconnectBoxWS: (rtspUrl: string) => void;
 }
+
+export interface BackendBox {
+  id: number | string
+  label: string
+  bbox: [number, number, number, number]  // [x, y, w, h]
+  confidence: number
+}
+
+export interface WSBoxPayload {
+  source_url: string
+  timestamp: number
+  boxes: BackendBox[]
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // Interface for a single Camera
 interface Camera {

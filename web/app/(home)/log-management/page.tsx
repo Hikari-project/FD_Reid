@@ -1,6 +1,17 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import useSWR from 'swr'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { LogFilters } from "@/components/log-management/log-filters"
+import { LogTable } from "@/components/log-management/log-table"
+import { PaginationBar } from "@/components/log-management/pagination-bar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -10,146 +21,49 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import { DatePickerWithRange } from "@/components/ui/date-range-picker"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+import { LogEntry, GetLogsResponse } from "@/components/log-management/types"
 
-interface LogEntry {
-  id: string
-  operationType: string
-  operationName: string
-  operationCategory: string
-  operator: string
-  operationTime: string
+// Fetcher function for SWR
+const fetcher = async (url: string): Promise<GetLogsResponse> => {
+  const res = await fetch(url)
+  if (!res.ok) {
+    const error = new Error('An error occurred while fetching the data.')
+    // Attach extra info to the error object.
+    // error.info = await res.json()
+    // error.status = res.status
+    throw error
+  }
+  return res.json()
 }
 
 export default function LogManagement() {
-  const [logs, setLogs] = useState<LogEntry[]>([
-    {
-      id: "01",
-      operationType: "盒子管理",
-      operationName: "盒子增删改查",
-      operationCategory: "取消异常",
-      operator: "读宇",
-      operationTime: "2025-01-05 12:01:20"
-    },
-    {
-      id: "02",
-      operationType: "用户管理",
-      operationName: "用户增删改查",
-      operationCategory: "取消异常",
-      operator: "读宇",
-      operationTime: "2025-01-05 12:01:20"
-    },
-    {
-      id: "03",
-      operationType: "终端配置",
-      operationName: "终端增删改查",  
-      operationCategory: "取消异常",
-      operator: "读宇",
-      operationTime: "2025-01-05 12:01:20"
-    },
-    {
-      id: "04",
-      operationType: "数据推送",
-      operationName: "数据推送",
-      operationCategory: "取消异常",
-      operator: "读宇",
-      operationTime: "2025-01-05 12:01:20"
-    },    
-    {
-      id: "05",
-      operationType: "视频流获取",
-      operationName: "视频流获取",
-      operationCategory: "取消异常",
-      operator: "读宇",
-      operationTime: "2025-01-05 12:01:20"
-    },
-    {
-      id: "06",
-      operationType: "视频流获取",
-      operationName: "视频流获取",
-      operationCategory: "取消异常",
-      operator: "读宇",
-      operationTime: "2025-01-05 12:01:20"
-    },
-    {
-      id: "07",
-      operationType: "视频流获取",
-      operationName: "视频流获取",
-      operationCategory: "取消异常",
-      operator: "读宇",
-      operationTime: "2025-01-05 12:01:20"
-    },
-    {
-      id: "08",
-      operationType: "视频流获取",
-      operationName: "视频流获取",  
-      operationCategory: "取消异常",
-      operator: "读宇",
-      operationTime: "2025-01-05 12:01:20"
-    },
-  ])
+  // Remove the initial static logs, data will come from SWR
+  // const [logs, setLogs] = useState<LogEntry[]>([]); 
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(8);
+
+  // SWR hook to fetch logs
+  // The API path /api/logs is assumed. Adjust if your backend route is different.
+  const { data: fetchedLogs, error, isLoading } = useSWR<GetLogsResponse>(
+    `/api/logs?page=${currentPage}&num=${itemsPerPage}`,
+    fetcher
+  );
+
+  // For now, totalLogCount will be based on the fetched items for the current page.
+  // Ideally, the API should provide a total count for proper pagination.
+  // Or, we might need another SWR call if there is a separate endpoint for total count.
+  const totalLogCount = fetchedLogs?.length || 0; 
+
+  // Handle loading and error states
+  if (isLoading) return <div className="p-6">Loading logs...</div>
+  if (error) return <div className="p-6">Failed to load logs. Error: {error.message}</div>
+
+  // If data is not yet available (e.g. initial load before SWR resolves), pass empty array
+  const logsToDisplay = fetchedLogs || [];
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center gap-4 flex-wrap">
-        <Select>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="请选择操作模块" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="box">盒子管理</SelectItem>
-            <SelectItem value="user">用户管理</SelectItem>
-            <SelectItem value="terminal">镜头配置</SelectItem>
-            <SelectItem value="data">数据推送</SelectItem>
-            <SelectItem value="video">视频流获取</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="请选择操作名" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="boxCrud">盒子增删改查</SelectItem>
-            <SelectItem value="authControl">权限修改</SelectItem>
-            <SelectItem value="terminalCrud">镜头增删改查</SelectItem>
-            <SelectItem value="monitor">监控调度</SelectItem>
-            <SelectItem value="userCrud">用户增删改查</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="请选择操作类型" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="abnormal">取流异常</SelectItem>
-            <SelectItem value="data">数据推送</SelectItem>
-            <SelectItem value="system">系统操作</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Input placeholder="请输入操作人" className="w-[200px]" />
-        
-        <DatePickerWithRange className="w-[300px]" />
-        <Button className="bg-blue-600 hover:bg-blue-700">查询</Button>
-        <Button variant="outline" className="text-blue-600 border-blue-600 hover:bg-blue-50">重置</Button>
-      </div>
+      <LogFilters />
 
       <div className="flex justify-between">
         <div></div>
@@ -226,83 +140,17 @@ export default function LogManagement() {
         </div>
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>编号</TableHead>
-            <TableHead>操作模块</TableHead>
-            <TableHead>操作名</TableHead>
-            <TableHead>操作类型</TableHead>
-            <TableHead>操作人</TableHead>
-            <TableHead>操作日期</TableHead>
-            <TableHead>操作</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {logs.map((log) => (
-            <TableRow key={log.id}>
-              <TableCell>{log.id}</TableCell>
-              <TableCell>{log.operationType}</TableCell>
-              <TableCell>{log.operationName}</TableCell>
-              <TableCell>{log.operationCategory}</TableCell>
-              <TableCell>{log.operator}</TableCell>
-              <TableCell>{log.operationTime}</TableCell>
-              <TableCell>
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button variant="link" className="text-blue-500">
-                      详情
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-[425px]">
-                    <DialogHeader className="mb-8">
-                      <DialogTitle className="text-xl font-medium">日志详情</DialogTitle>
-                    </DialogHeader>
-                    <div className="grid gap-8">
-                      <div className="grid gap-8">
-                        <div className="grid grid-cols-[120px_1fr] items-center">
-                          <div className="text-left pl-7 text-sm text-gray-500">操作模块</div>
-                          <Input value={log.operationType} readOnly className="bg-gray-50" />
-                        </div>
-                        <div className="grid grid-cols-[120px_1fr] items-center">
-                          <div className="text-left pl-7 text-sm text-gray-500">操作名</div>
-                          <Input value={log.operationName} readOnly className="bg-gray-50" />
-                        </div>
-                        <div className="grid grid-cols-[120px_1fr] items-center">
-                          <div className="text-left pl-7 text-sm text-gray-500">操作类型</div>
-                          <Input value={log.operationCategory} readOnly className="bg-gray-50" />
-                        </div>
-                        <div className="grid grid-cols-[120px_1fr] items-center">
-                          <div className="text-left pl-7 text-sm text-gray-500">操作人</div>
-                          <Input value={log.operator} readOnly className="bg-gray-50" />
-                        </div>
-                        <div className="grid grid-cols-[120px_1fr] items-center">
-                          <div className="text-left pl-7 text-sm text-gray-500">操作日期</div>
-                          <Input value={log.operationTime} readOnly className="bg-gray-50" />
-                        </div>
-                      </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+      <LogTable logs={logsToDisplay} />
 
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-gray-500">共20条</div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="text-blue-600 border-blue-600 hover:bg-blue-50">上一页</Button>
-          <Button variant="outline" size="sm" className="text-blue-600 border-blue-600 hover:bg-blue-50">1</Button>
-          <Button variant="outline" size="sm" className="text-blue-600 border-blue-600 hover:bg-blue-50">2</Button>
-          <Button variant="outline" size="sm" className="text-blue-600 border-blue-600 hover:bg-blue-50">3</Button>
-          <Button variant="outline" size="sm" className="text-blue-600 border-blue-600 hover:bg-blue-50">下一页</Button>
-          <span className="mx-2">前往</span>
-          <Input className="w-16" />
-          <span>页</span>
-        </div>
-      </div>
+      {/* 
+        Note on Pagination: 
+        The current `totalLogCount` is just the number of items on the current page. 
+        For true pagination, the API needs to return the overall total number of logs, 
+        or we need a separate endpoint to fetch this total. 
+        The PaginationBar component will also need to be updated to handle page changes,
+        which would then trigger a re-fetch with SWR by changing `currentPage`.
+      */}
+      <PaginationBar totalItems={totalLogCount} />
     </div>
   )
 }
