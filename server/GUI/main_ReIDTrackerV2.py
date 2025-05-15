@@ -104,6 +104,7 @@ class StreamManager:
     """
 
     def __init__(self, temp_dir=None, max_reconnect=10, mjpeg_server_port=8554,
+
                  frame_queue=[asyncio.Queue(maxsize=10)],rtsp_datas={}):
         """
         初始化流管理器
@@ -151,8 +152,9 @@ class StreamManager:
         }
         self.origin_video_rtsp_dict = {}
 
-        self.rtsp_datas=rtsp_datas
 
+    def load_model(self):
+        pass
 
     def is_rtsp_url(self, url: str) -> bool:
         """
@@ -277,9 +279,95 @@ class StreamManager:
 
             return mjpeg_list
 
+    def update_stream_status(self, index: int, active: bool, reconnect_increment=False) -> bool:
+        """
+        更新流状态
+
+        Args:
+            index: 流索引
+            active: 是否活跃
+            reconnect_increment: 是否增加重连计数
+
+        Returns:
+            bool: 更新是否成功
+        """
+        with self.lock:
+            if 0 <= index < len(self.streams):
+                self.streams[index].active = active
+                self.streams[index].last_update = time.time()
+
+                if reconnect_increment:
+                    self.streams[index].reconnect_count += 1
+
+                return True
+            return False
+
+    def reset_reconnect_count(self, index: int) -> bool:
+        """
+        重置流的重连计数
+
+        Args:
+            index: 流索引
+
+        Returns:
+            bool: 重置是否成功
+        """
+        with self.lock:
+            if 0 <= index < len(self.streams):
+                self.streams[index].reconnect_count = 0
+                return True
+            return False
 
 
-    async def process_video_in_thread(self, video_source, temp_data={},
+
+
+
+    def should_reconnect(self, index: int) -> bool:
+        """
+        检查是否应该继续尝试重连
+
+        Args:
+            index: 流索引
+
+        Returns:
+            bool: 是否应该继续尝试重连
+        """
+        with self.lock:
+            if 0 <= index < len(self.streams):
+                return (self.streams[index].reconnect_count < self.max_reconnect and
+                        self.streams[index].active and
+                        self.streams[index].is_rtsp)
+            return False
+
+    def rtsp_2_frames(self, rtsp_url):
+        def _rtsp_2_frames(rtsp_url):
+            cap = cv2.VideoCapture(rtsp_url)
+            index=self.get_valid_origin_queue_index()
+            self.origin_video_rtsp_dict[rtsp_url] = index
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if ret:
+                    try:
+                        print(self.origin_frame_queue[0].qsize())
+                        # cv2.imshow('frame2', frame)
+                        # cv2.waitKey(1)
+
+                        self.origin_frame_queue[index].put(frame, block=False)
+                    except queue.Full:
+                        _= self.origin_frame_queue[index].get()
+                        pass  # 忽略队列满的情况
+
+
+                else:
+                    print("RTSP读取失败，尝试重连...")
+                    break
+            cap.release()
+
+        thread=threading.Thread(target=_rtsp_2_frames, args=(rtsp_url,))
+        thread.start()
+
+
+    def process_video_in_thread(self, video_source, temp_data={},
                                 skip_frames=2, match_thresh=0.15, is_track=True, save_video=False,
                                 stream_manager=None, show_window=True, window_name=None, queue_index=0):
         """
@@ -308,11 +396,17 @@ class StreamManager:
         print(self.rtsp_datas)
         current_rtsp_data=self.rtsp_datas[video_source]
 
-        asyncio.set_event_loop(current_rtsp_data.mainloop)
-        print('...11')
-        async def _process_video_task(current_rtsp_data):
-            """线程内运行的任务函数"""
+        # 如果没有指定窗口名称，创建一个
+        if window_name is None:
+            stream_id = 0
+            if stream_manager:
+                stream_id = stream_manager.get_next_stream_id()
+            window_name = f"Video Stream {stream_id}"
+        else:
+            stream_id = window_name.split()[-1] if window_name.split()[-1].isdigit() else 0
 
+        async def _process_video_task():
+            """线程内运行的任务函数"""
             # 创建日志系统
             log_system = LogSystem()
 
@@ -325,15 +419,32 @@ class StreamManager:
             frame_count=0
             #current_rtsp_data.origin_frame_queue=asyncio.Queue(maxsize=1)
 
-            while not current_rtsp_data.stop_event.is_set():
+            # 设置视频写入器（如果需要保存）
+            if save_video and video_path:  # 只有当提供了视频路径时才保存
+                tracker.setup_video_writer(video_path, suffix=f"_processed_{stream_id}")
+
+            # 如果需要显示，创建窗口
+            if show_window and show:
+                cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+
+            # 记录帧计数和上次重连时间
+            frame_count = 0
+            last_reconnect_time = 0
+            reconnect_interval = 5  # 重连间隔，秒
+
+            # 通知流管理器流已开始
+            if stream_manager:
+                stream_manager.update_stream_status(stream_id, True)
+
+            # 主循环
+            index=self.origin_video_rtsp_dict[video_source]
+
+            while not stop_event.is_set():
                 try:
                     # 尝试读取帧
-                    # 同步队列获取，（使用线程池避免阻塞）
-                   # print(current_rtsp_data.origin_frame_queue.qsize())
-                   #   print('origin:', str(current_rtsp_data.origin_frame_queue.qsize()))
-                   #  if current_rtsp_data.process_frame_queue.qsize()>5:
-                   #      continue
-                   #      asyncio.sleep(0.05)
+
+                    frame = self.origin_frame_queue[index].get()
+                    # ret,frame=cap.read()
 
 
                     frame = current_rtsp_data.origin_frame_queue.get()
@@ -393,6 +504,13 @@ class StreamManager:
                     # )
 
                     #processed_frame=frame
+
+                    # 增加帧计数
+                    frame_count += 1
+
+
+                    # 使用跟踪器处理帧
+                    processed_frame, info = await tracker.process_frame(frame, 0, match_thresh, is_track)
 
                     # 将处理后的帧放入队列
                     if processed_frame is not None:
@@ -516,12 +634,23 @@ class StreamManager:
                 except asyncio.QueueEmpty:
                     break
 
+    def get_valid_origin_queue_index(self):
+        """
+        查询目前哪个队列可以用
+        :return:
+        """
+        print(self.origin_frame_queue_status.items())
+        for key, value in self.origin_frame_queue_status.items():
+            if value:
+                self.origin_frame_queue[key] = queue.Queue(maxsize=10) # 清空这个队列
+                self.origin_frame_queue_status[key] = False  # 这个队列已使用
+                return key
 
 
     def stop_process_video_in_thread(self,rtsp_url):
         try:
-            current_rtsp_data=self.rtsp_datas[rtsp_url]
-            current_rtsp_data.stop_event.set()
+
+
 
 
             # # 停止线程
@@ -529,11 +658,30 @@ class StreamManager:
             # # 清除队列
             # self.clear_queue(queue_index)
 
+            queue_index=self.video_rtsp_dict[rtsp_url]
+
+            # 停止线程
+            self.video_thread_info[queue_index]['stop_event'].set()
+            # 清除队列
+            self.clear_queue(queue_index)
+
         except Exception as e:
             print('stop error :', str(e))
         #self.stop_event.set()
 
 
+
+    def get_valid_queue_index(self):
+        """
+        查询目前哪个队列可以用
+        :return:
+        """
+        print(self.handle_queue_status.items())
+        for key, value in self.handle_queue_status.items():
+            if value:
+                self.handle_frame[key] = FixedSizeAsyncQueue(maxsize=10)  # 清空这个队列
+                self.handle_queue_status[key] = False  # 这个队列已使用
+                return key
 
 
     def _encode_frame(self, frame):
@@ -542,6 +690,13 @@ class StreamManager:
         _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
         return buffer.tobytes()
 
+    def format_data(self, video_datas):
+        config_list = [
+            {
+                "rtsp_video": 'rtsp://localhost:5555/live',
+                "points": [[500, 600], [750, 600], [750, 400], [500, 400]]
+            }
+        ]
 
     async def consume_frame(self, rtsp_url):
         # print(threading.current_thread())
@@ -574,7 +729,16 @@ class StreamManager:
                 self._encode_frame,  # 独立编码函数
                 frame
             )
+        print("视频流：{}".format(video_id))
+        while True:
+            print('...1')
+            frame = await self.handle_frame[video_id].get()
+            if show:
+                cv2.imshow('frame', frame)
+                cv2.waitKey(1)
 
+            _, buffer = cv2.imencode('.jpg', frame)
+            _frame_cache = buffer.tobytes()
             yield (
                     b'--frame\r\n'
                     b'Content-Type: image/jpeg\r\n\r\n' +
