@@ -10,7 +10,8 @@ import type {
   initialRtspStreamInfo,
   BackendBox, 
   WSBoxPayload,
-  ZoneType // ZoneType is used for function params and state
+  ZoneType, // ZoneType is used for function params and state
+  AnalysisResult
 } from '@/store/types';
 
 export const backendUrl = 'http://192.168.21.161:3002'
@@ -224,6 +225,7 @@ export const useAppStore = create<AppState & AppActions>()(
                 boxes: [],
                 wsStatus: streamData.rtsp_url ? 'disconnected' : 'idle',
                 wsErrorMessage: null,
+                analysisResult: null,
               };
               newRtspSources[streamData.rtsp_url] = newSourceInfo;
               loadedUrls.push(streamData.rtsp_url);
@@ -301,6 +303,7 @@ export const useAppStore = create<AppState & AppActions>()(
                 boxes: [],
                 wsStatus: 'idle',
                 wsErrorMessage: null,
+                analysisResult: null,
               };
             });
           });
@@ -441,6 +444,7 @@ export const useAppStore = create<AppState & AppActions>()(
                     source.boxes = [];
                     source.wsStatus = 'idle';
                     source.wsErrorMessage = null;
+                    source.analysisResult = null;
                     if (state.activeSourceUrl === url) {
                         state.annotationMode = source.annotation.isClosed ? 'line_selection' : (source.firstFrameDataUrl ? 'drawing' : 'idle');
                     }
@@ -521,6 +525,7 @@ export const useAppStore = create<AppState & AppActions>()(
               source.boxes = [];
               source.wsStatus = 'idle';
               source.wsErrorMessage = null;
+              source.analysisResult = null;
               if(state.activeSourceUrl === url) {
                   state.annotationMode = source.firstFrameDataUrl ? 'drawing' : 'idle';
               }
@@ -641,8 +646,7 @@ export const useAppStore = create<AppState & AppActions>()(
           const hostAndPath = backendUrl.split('//')[1];
           // const wsUrl = `${wsProtocol}://${hostAndPath}/ws/boxes/${rtspUrl}?token=${token}`;
           const wsUrl = `ws://192.168.21.161:3002/customer-flow/ws?rtsp_url=${token}`;
-          console.log(`Connecting WebSocket for boxes: ${wsUrl}`);
-          set(state => { if (state.rtspSources[rtspUrl]) { state.rtspSources[rtspUrl].wsStatus = 'connecting'; state.rtspSources[rtspUrl].wsErrorMessage = null; state.rtspSources[rtspUrl].boxes = []; } });
+          set(state => { if (state.rtspSources[rtspUrl]) { state.rtspSources[rtspUrl].wsStatus = 'connecting'; state.rtspSources[rtspUrl].wsErrorMessage = null; state.rtspSources[rtspUrl].boxes = []; state.rtspSources[rtspUrl].analysisResult = null; } });
           try {
             const ws = new WebSocket(wsUrl);
             (ws as any).isIntentionallyClosed = false;
@@ -653,10 +657,16 @@ export const useAppStore = create<AppState & AppActions>()(
             };
             ws.onmessage = (event) => {
               try {
-                console.log("event.data", event.data);
                 const payload = JSON.parse(event.data as string) as WSBoxPayload;
-                console.log("payload", payload.source_url, rtspUrl);
-                if (payload.source_url === rtspUrl) set(state => { if (state.rtspSources[rtspUrl]) state.rtspSources[rtspUrl].boxes = payload.boxes; });
+                if (payload.source_url === rtspUrl) {
+                  set(state => { 
+                    if (state.rtspSources[rtspUrl]) {
+                      state.rtspSources[rtspUrl].boxes = payload.boxes;
+                      console.log("payload.result", payload.result);
+                      state.rtspSources[rtspUrl].analysisResult = payload.result ?? null;
+                    }
+                  });
+                }
               } catch (e) { console.error(`Error parsing WebSocket message for ${rtspUrl}:`, e); }
             };
             ws.onerror = (event) => {
@@ -674,7 +684,7 @@ export const useAppStore = create<AppState & AppActions>()(
                 if (currentSrc && currentSrc.wsToken && currentSrc.wsStatus !== 'idle') attemptReconnect(rtspUrl);
                 else reconnectAttempts.delete(rtspUrl);
               } else {
-                set(state => { if (state.rtspSources[rtspUrl]) { state.rtspSources[rtspUrl].wsStatus = intentionallyClosed ? 'idle' : 'disconnected'; state.rtspSources[rtspUrl].wsErrorMessage = null; state.rtspSources[rtspUrl].boxes = []; } });
+                set(state => { if (state.rtspSources[rtspUrl]) { state.rtspSources[rtspUrl].wsStatus = intentionallyClosed ? 'idle' : 'disconnected'; state.rtspSources[rtspUrl].wsErrorMessage = null; state.rtspSources[rtspUrl].boxes = []; state.rtspSources[rtspUrl].analysisResult = null; } });
                 reconnectAttempts.delete(rtspUrl);
               }
             };
@@ -685,7 +695,7 @@ export const useAppStore = create<AppState & AppActions>()(
           const ws = wsConnections.get(rtspUrl);
           if (ws) { (ws as any).isIntentionallyClosed = true; ws.close(1000, 'Client disconnected intentionally'); wsConnections.delete(rtspUrl); }
           reconnectAttempts.delete(rtspUrl);
-          set(state => { if (state.rtspSources[rtspUrl]) { state.rtspSources[rtspUrl].wsStatus = 'idle'; state.rtspSources[rtspUrl].boxes = []; state.rtspSources[rtspUrl].wsErrorMessage = null; } });
+          set(state => { if (state.rtspSources[rtspUrl]) { state.rtspSources[rtspUrl].wsStatus = 'idle'; state.rtspSources[rtspUrl].boxes = []; state.rtspSources[rtspUrl].wsErrorMessage = null; state.rtspSources[rtspUrl].analysisResult = null; } });
         },
         
         setGlobalStatus: (status, message) => {
@@ -725,12 +735,14 @@ export const useAppStore = create<AppState & AppActions>()(
                   state.rtspSources[url].boxes = sourceDataFromLoad.boxes || [];
                   state.rtspSources[url].wsStatus = sourceDataFromLoad.wsStatus || (state.rtspSources[url].wsToken ? 'disconnected' : 'idle');
                   state.rtspSources[url].wsErrorMessage = sourceDataFromLoad.wsErrorMessage || null;
+                  state.rtspSources[url].analysisResult = sourceDataFromLoad.analysisResult || null;
                 } else {
                   state.rtspSources[url] = {
                     ...sourceDataFromLoad,
                     boxes: sourceDataFromLoad.boxes || [],
                     wsStatus: sourceDataFromLoad.wsStatus || (sourceDataFromLoad.wsToken ? 'disconnected' : 'idle'),
                     wsErrorMessage: sourceDataFromLoad.wsErrorMessage || null,
+                    analysisResult: sourceDataFromLoad.analysisResult || null,
                   };
                 }
               }
@@ -757,7 +769,7 @@ export const useAppStore = create<AppState & AppActions>()(
         if (state.rtspSources) {
           persistedState.rtspSources = Object.fromEntries(
             Object.entries(state.rtspSources).map(([key, value]) => {
-              const { boxes, wsStatus, wsErrorMessage, ...persistedSourceData } = value;
+              const { boxes, wsStatus, wsErrorMessage, analysisResult, ...persistedSourceData } = value;
               return [ key, { ...persistedSourceData, rawMjpegStreamUrl: value.rawMjpegStreamUrl ?? null }];
             })
           );
@@ -772,6 +784,7 @@ export const useAppStore = create<AppState & AppActions>()(
               source.boxes = [];
               source.wsStatus = source.wsToken ? 'disconnected' : 'idle';
               source.wsErrorMessage = null;
+              source.analysisResult = null;
               // Auto-reconnect for active source with token could be triggered here or by UI effect
               // For example, if source.url === state.activeSourceUrl && source.wsToken:
               //   setTimeout(() => useAppStore.getState().connectBoxWS(source.url), 500);
@@ -807,3 +820,6 @@ export const selectActiveSourceWsStatus = (state: AppState): RtspSourceInfo['wsS
 
 export const selectActiveSourceWsError = (state: AppState): string | null | undefined =>
   selectActiveSourceData(state)?.wsErrorMessage;
+
+export const selectActiveSourceAnalysisResult = (state: AppState): AnalysisResult | null | undefined =>
+  selectActiveSourceData(state)?.analysisResult;

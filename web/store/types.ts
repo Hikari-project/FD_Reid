@@ -41,6 +41,7 @@ export interface RtspSourceInfo {
   boxes?: BackendBox[];
   wsStatus?: 'idle' | 'connecting' | 'connected' | 'disconnected' | 'error';
   wsErrorMessage?: string | null;
+  analysisResult?: AnalysisResult | null;
 }
 
 export interface initialRtspStreamInfo {
@@ -122,9 +123,15 @@ export interface WSBoxPayload {
   source_url: string
   timestamp: number
   boxes: BackendBox[]
+  result: AnalysisResult
 }
 
-
+export interface AnalysisResult {
+  enter_count: number
+  exit_count: number
+  Pass_count: number
+  re_enter_count: number
+}
 
 
 
