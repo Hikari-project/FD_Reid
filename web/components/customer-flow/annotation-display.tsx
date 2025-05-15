@@ -15,8 +15,9 @@ import {
   selectActiveSourceBoxes,
   selectActiveSourceWsStatus,
   selectActiveSourceWsError,
+  selectActiveSourceAnalysisResult,
 } from '@/store/useCustomerAnalysis';
-import type { Point, BackendBox } from '@/store/types';
+import type { Point, BackendBox, AnalysisResult } from '@/store/types';
 
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -44,6 +45,7 @@ export default function AnnotationDisplay() {
   const boxes = useAppStore(selectActiveSourceBoxes);
   const wsStatus = useAppStore(selectActiveSourceWsStatus);
   const wsErrorMessage = useAppStore(selectActiveSourceWsError);
+  const analysisResult = useAppStore(selectActiveSourceAnalysisResult);
 
   const stageRef = useRef<Konva.Stage>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -231,8 +233,6 @@ export default function AnnotationDisplay() {
         );
     }
 
-    console.log("boxessssssssss", activeSource.boxes);
-
     return (
       <div className="relative w-full h-full bg-gray-900 overflow-hidden">
         {canSelectLines && (
@@ -263,12 +263,22 @@ export default function AnnotationDisplay() {
           </div>
         )}
         {(wsStatus !== 'idle' || (activeSource.status === 'streaming' && wsStatus === 'idle' && activeSource.wsToken)) && (
-            <div className="absolute top-2 right-2 z-30 bg-black/60 text-white p-1.5 px-2.5 rounded-md text-xs shadow-lg">
-                {wsStatus === 'connecting' && "连接目标框数据流..."}
-                {wsStatus === 'connected' && (boxes && boxes.length > 0 ? `目标框: ${boxes.length}` : "等待目标框数据...")}
-                {wsStatus === 'disconnected' && "目标框数据流已断开"}
-                {wsStatus === 'error' && `目标框数据流错误: ${wsErrorMessage || '未知错误'}`}
-                {activeSource.status === 'streaming' && wsStatus === 'idle' && activeSource.wsToken && "正在初始化目标框数据流..."}
+            <div className="absolute top-2 right-2 z-30 bg-black/60 text-white p-1.5 px-2.5 rounded-md text-xl shadow-lg flex flex-col space-y-1 items-end">
+                <div>
+                  {wsStatus === 'connecting' && "连接目标框数据流..."}
+                  {wsStatus === 'connected' && (boxes && boxes.length > 0 ? `目标框: ${boxes.length}` : "等待目标框数据...")}
+                  {wsStatus === 'disconnected' && "目标框数据流已断开"}
+                  {wsStatus === 'error' && `目标框数据流错误: ${wsErrorMessage || '未知错误'}`}
+                  {activeSource.status === 'streaming' && wsStatus === 'idle' && activeSource.wsToken && "正在初始化目标框数据流..."}
+                </div>
+                {wsStatus === 'connected' && analysisResult && (
+                  <div className="border-t border-white/20 pt-1 mt-1 w-full text-xl">
+                    <p>进入: {analysisResult.enter_count}</p>
+                    <p>离开: {analysisResult.exit_count}</p>
+                    <p>经过: {analysisResult.Pass_count}</p>
+                    <p>重入: {analysisResult.re_enter_count}</p>
+                  </div>
+                )}
             </div>
         )}
         {activeSource.status === 'streaming' && activeSource.mjpegStreamUrl && activeSource.mjpegStreamUrl !== 'error' && (
@@ -435,6 +445,7 @@ export default function AnnotationDisplay() {
     boxes,
     wsStatus,
     wsErrorMessage,
+    analysisResult,
     handleStageMouseDown,
     handleLineClick,
     handleZoneTypeChange,
