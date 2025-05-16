@@ -7,6 +7,8 @@
 @Date    :2025/04/21 9:22 
 @Describe:
 '''
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from urllib.request import Request
 
 import fastapi
@@ -92,25 +94,67 @@ app.mount(static_path[1:], StaticFiles(directory="static"), name="static")
 
 # 全局变量存储推流状态
 stream_objects = {}
+# 降低分辨率
+target_width = 1280
+
+def _encode_frame( frame):
+    """独立编码函数"""
+    # 可在此处添加硬件加速逻辑
+    # if is_resize:
+    #     frame=cv2.resize(frame,(width,height))
+    _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
+    return buffer.tobytes()
+# 创建编码线程池（根据CPU核心数调整）
+encode_executor = ThreadPoolExecutor(max_workers=4)
+async def rtsp_generate_mjpeg(rtsp_url):
+    # 优化视频捕获参数
+    cap = cv2.VideoCapture(rtsp_url+'?tcp', cv2.CAP_FFMPEG)
+
+    # 强制使用 TCP 传输协议
+    # cap.set(cv2.CAP_PROP_FFMPEG_TRANSPORT_OPT, "tcp")
+
+    # 减少缓冲区大小（默认值：500ms）
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 2)  # 单位：帧数
+
+    # 设置超时时间（单位：毫秒）
+    #cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MS, 5000)
+
+    # 配置解码参数
+    cap.set(cv2.CAP_PROP_HW_ACCELERATION, cv2.VIDEO_ACCELERATION_ANY)  # 启用硬件加速
+    loop = asyncio.get_event_loop()
+
+    # is_resize = False
+    # # 如果画面大于1920则进行resize
+    # min_width_px = 1280
+    #
+    # ret, frame = cap.read()
+    # height, width = frame.shape[:2]
+    #
+    # if width > min_width_px:
+    #     new_h = height * min_width_px // width
+    #     width, height = min_width_px, new_h
+    #     is_resize = True
 
 
-
-
-def rtsp_generate_mjpeg(rtsp_url):
-    # if isinstance(rtsp_url,str):
-    #     cap = cv2.VideoCapture(rtsp_url)
-    # elif isinstance(rtsp_url,cv2.VideoCapture):
-    #     cap = rtsp_url
-
-    cap = cv2.VideoCapture(rtsp_url,cv2.CAP_FFMPEG)
     while True:
         try:
             ret, frame = cap.read()
             if not ret:
-                break
-            ret, jpeg = cv2.imencode('.jpg', frame)
+                # 自动重连机制
+                print("Connection lost, reconnecting...")
+                cap.release()
+                cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
+                continue
+
+            # 将编码任务提交到线程池
+            _frame_cache = await loop.run_in_executor(
+                encode_executor,
+                _encode_frame,  # 独立编码函数
+                frame
+            )
+
             yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n\r\n')
+                   b'Content-Type: image/jpeg\r\n\r\n' + _frame_cache + b'\r\n\r\n')
         except Exception as e:
             print('rtsp_generate_mjpeg',str(e))
     cap.release()
