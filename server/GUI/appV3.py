@@ -215,16 +215,21 @@ async def custome_analysisV2(video_config:VideoConfig):
     return {"ret": 0, "message": '已开启', "res": mjpeg_list}
 
 @app.post('/customer-flow/stop-analysis')
-def stop_analysis(rtsp:RTSP):
+async def stop_analysis(rtsp:RTSP):
     app.state.stream_manager.stop_process_video_in_thread(rtsp.rtsp_url)
 
     stream_id=app.state.rtsp_stream_id[rtsp.rtsp_url]
-    app.state.ws_manager.disconnect(stream_id)
+    await app.state.ws_manager.disconnect(stream_id)
     return {"ret":0,"message":"停止成功"}
+
 
 @app.get('/customer-flow/get-rtsp')
 def get_rtsp():
     """返回rtsp流信息"""
+
+
+    for key ,value in app.state.rtsp_stream_id.items():
+        app.state.rtsp_stream_id[key]=value  #
     return {"ret":0,"HandleRTSPData":app.state.handleRTSPData}
 
 
@@ -248,10 +253,16 @@ async def websocket_endpoint(websocket: WebSocket):
     """请求这个rtsp，返回这个rtsp流的处理结果"""
     print(f'ws连接请求中。{ websocket.query_params.get("rtsp_url")}')
     rtsp_url = websocket.query_params.get("rtsp_url")
+    try:
+        rtsp_url=app.state.rtsp_stream_id[rtsp_url] # 将传入的stream_id转为rtsp_url
+    except Exception as e:
+        print(e)
+        return
+
     if not rtsp_url:
         await websocket.close(code=1008, reason="RTSP URL required")
         return
-    rtsp_url=app.state.rtsp_stream_id[rtsp_url] # 将传入的stream_id转为rtsp_url
+
     await app.state.ws_manager.connect(websocket, rtsp_url)
 
     try:
