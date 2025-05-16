@@ -61,7 +61,7 @@ async function startAnalysisOnBackend(
       source_url: string,
       mjpeg_url: string,
       is_rtsp: boolean,
-      stream_index: number,
+      stream_id: string,
       // ws_token?: string, 
     }>
   }> {
@@ -221,7 +221,7 @@ export const useAppStore = create<AppState & AppActions>()(
                 status: mjpegStreamUrlForState ? 'streaming' : (streamData.frame_url ? 'frame_loaded' : 'idle'),
                 errorMessage: null,
                 imageDimensions: undefined,
-                wsToken: streamData.rtsp_url || undefined,
+                wsToken: streamData.stream_id || undefined,
                 boxes: [],
                 wsStatus: streamData.rtsp_url ? 'disconnected' : 'idle',
                 wsErrorMessage: null,
@@ -583,8 +583,8 @@ export const useAppStore = create<AppState & AppActions>()(
               if (currentSource) {
                 currentSource.mjpegStreamUrl = analysisResult.mjpeg_url ? `${backendUrl}${analysisResult.mjpeg_url}` : null;
                 currentSource.status = currentSource.mjpegStreamUrl ? 'streaming' : 'annotated'; // Or 'analysis_active'
-                if (analysisResult.source_url) {
-                  currentSource.wsToken = analysisResult.source_url;
+                if (analysisResult.stream_id) {
+                  currentSource.wsToken = analysisResult.stream_id;
                 } else {
                   console.warn(`No ws_token received for ${url} from analysis backend.`);
                 }
@@ -641,11 +641,12 @@ export const useAppStore = create<AppState & AppActions>()(
             }
           }
           reconnectAttempts.delete(rtspUrl);
-          const token = source.url;
+          const token = source.wsToken;
           const wsProtocol = backendUrl.startsWith('https') ? 'wss' : 'ws';
           const hostAndPath = backendUrl.split('//')[1];
           // const wsUrl = `${wsProtocol}://${hostAndPath}/ws/boxes/${rtspUrl}?token=${token}`;
           const wsUrl = `ws://192.168.21.161:3002/customer-flow/ws?rtsp_url=${token}`;
+          console.log(`Attempting to wsToken ${source.wsToken} for boxes WS in ${source.url})`);
           set(state => { if (state.rtspSources[rtspUrl]) { state.rtspSources[rtspUrl].wsStatus = 'connecting'; state.rtspSources[rtspUrl].wsErrorMessage = null; state.rtspSources[rtspUrl].boxes = []; state.rtspSources[rtspUrl].analysisResult = null; } });
           try {
             const ws = new WebSocket(wsUrl);

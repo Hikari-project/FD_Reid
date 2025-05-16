@@ -32,7 +32,7 @@ import cv2
 import time
 import threading
 from typing import List,Tuple
-from main_ReIDTracker import StreamManager
+from main_ReIDTrackerV2 import StreamManager
 
 from contextlib import asynccontextmanager
 import os
@@ -282,9 +282,7 @@ def set_rtsp_name(rtsp:RTSP):
 #     top_stats = snapshot.statistics('lineno')
 #     return {"memory_stats": [str(stat) for stat in top_stats[:5]]}
 
-if __name__ == '__main__':
-    uvicorn.run("appV2:app", host='0.0.0.0', port=3002)
-=======
+
 @app.get('/customer-flow/video_feed')
 async def video_feed(video_id:int):
     print("。、video_feed3 调用")
@@ -414,8 +412,6 @@ async def check_rtsp(rtsp: RTSP):
     if not cap.isOpened():
         raise HTTPException(status_code=400, detail="无法打开RTSP流")
 
-
-
     # 增加重连次数和超时处理
 
     valid_frame =None
@@ -506,8 +502,8 @@ async def get_memory_snapshot():
 
 
 if __name__ == "__main__":
-
     import uvicorn
+
 
     # 获取主事件循环
     mainloop = asyncio.get_event_loop()
@@ -527,4 +523,4 @@ if __name__ == "__main__":
     mainloop.run_until_complete(server.serve())
 
 
->>>>>>> Stashed changes
+

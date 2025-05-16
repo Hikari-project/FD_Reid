@@ -23,6 +23,7 @@ class ConnectionManager:
         self.tasks: Dict[str, asyncio.Task] = {}
         self.rtsp_datas = rtsp_datas
 
+
     async def connect(self, websocket: WebSocket, rtsp_url: str):
         await websocket.accept()
         self.active_connections[rtsp_url] = websocket
@@ -46,8 +47,9 @@ class ConnectionManager:
         finally:
             await self.disconnect(rtsp_url)
 
-    async def disconnect(self, rtsp_url: str):
-        if rtsp_url in self.active_connections:
+    async def disconnect(self, stream_id: str):
+        if stream_id in self.active_connections:
+            rtsp_url=self.rtsp_stream_id[stream_id]
             del self.active_connections[rtsp_url]
         if rtsp_url in self.tasks:
             self.tasks[rtsp_url].cancel()

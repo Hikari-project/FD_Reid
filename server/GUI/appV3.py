@@ -66,6 +66,7 @@ async def lifespan(app:FastAPI):
     app.state.video_thread_info={}
 
     # wsmanage
+    app.state.rtsp_stream_id={}
     app.state.ws_manager = ConnectionManager(app.state.rtsp_datas)
     yield
     # 清理资源
@@ -113,6 +114,8 @@ def rtsp_generate_mjpeg(rtsp_url):
         except Exception as e:
             print('rtsp_generate_mjpeg',str(e))
     cap.release()
+
+
 from RTSPData import HandleRTSPData
 @app.post('/customer-flow/check-rtsp')
 async def check_rtsp(rtsp:RTSP,db:Session=Depends(get_db)):
@@ -142,8 +145,9 @@ async def check_rtsp(rtsp:RTSP,db:Session=Depends(get_db)):
     )).start()
 
     # 存储已处理信息
-    hanle_rtsp_data=HandleRTSPData(rtsp_url=rtsp.rtsp_url,frame_url=f"/static/frames/{rtsp_data.stream_id}.jpg",mjpeg_stream=f"/customer-flow/video-stream/{rtsp_data.stream_id}",name=rtsp_data.name)
+    hanle_rtsp_data=HandleRTSPData(rtsp_url=rtsp.rtsp_url,frame_url=f"/static/frames/{rtsp_data.stream_id}.jpg",mjpeg_stream=f"/customer-flow/video-stream/{rtsp_data.stream_id}",name=rtsp_data.name,stream_id=rtsp_data.stream_id)
     app.state.handleRTSPData[rtsp.rtsp_url]=hanle_rtsp_data
+    app.state.rtsp_stream_id[rtsp_data.stream_id]=rtsp.rtsp_url # stream_id映射到rtsp
 
 
     # 记录开始日志
@@ -160,7 +164,8 @@ async def check_rtsp(rtsp:RTSP,db:Session=Depends(get_db)):
         "frame_id": rtsp_data.stream_id,
         "frame_url": f"/static/frames/{rtsp_data.stream_id}.jpg",
         "size": {"height": rtsp_data.height, "width": rtsp_data.width},
-        "mjpeg_stream": f"/customer-flow/video-stream/{rtsp_data.stream_id}"
+        "mjpeg_stream": f"/customer-flow/video-stream/{rtsp_data.stream_id}",
+        "stream_id": rtsp_data.stream_id,
     }
 
 
@@ -178,7 +183,6 @@ async def video_stream(stream_id: str):
 @app.get('/customer-flow/video_feed')
 async def video_feed(stream_id):
     """推流处理的视频流"""
-
 
     rtsp_url=app.state.stream_2_rtsp_dict[stream_id]
 
@@ -213,6 +217,9 @@ async def custome_analysisV2(video_config:VideoConfig):
 @app.post('/customer-flow/stop-analysis')
 def stop_analysis(rtsp:RTSP):
     app.state.stream_manager.stop_process_video_in_thread(rtsp.rtsp_url)
+
+    stream_id=app.state.rtsp_stream_id[rtsp.rtsp_url]
+    app.state.ws_manager.disconnect(stream_id)
     return {"ret":0,"message":"停止成功"}
 
 @app.get('/customer-flow/get-rtsp')
@@ -239,17 +246,19 @@ def set_rtsp_name(rtsp:RTSP):
 @app.websocket("/customer-flow/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """请求这个rtsp，返回这个rtsp流的处理结果"""
+    print(f'ws连接请求中。{ websocket.query_params.get("rtsp_url")}')
     rtsp_url = websocket.query_params.get("rtsp_url")
     if not rtsp_url:
         await websocket.close(code=1008, reason="RTSP URL required")
         return
-
+    rtsp_url=app.state.rtsp_stream_id[rtsp_url] # 将传入的stream_id转为rtsp_url
     await app.state.ws_manager.connect(websocket, rtsp_url)
 
     try:
         while True:
             # 保持连接活跃，接收任意消息（可选）
             await websocket.receive_text()
+
     except WebSocketDisconnect:
         await app.state.ws_manager.disconnect(rtsp_url)
 

@@ -276,7 +276,8 @@ class StreamManager:
                 "source_url": url,
                 "mjpeg_url": f"/customer-flow/video-stream/{stream_id}",
                 "is_rtsp": is_rtsp,
-                "stream_index": queue_index
+                "stream_index": queue_index,
+                "stream_id":stream_id
             })
 
             return mjpeg_list

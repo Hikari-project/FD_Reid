@@ -52,6 +52,7 @@ export interface initialRtspStreamInfo {
   name: string;           // 别名，可为空
   create_time: string;    // 创建时间，ISO 或日期字符串
   ws_token?: string;      // Added ws_token here if backend provides it initially
+  stream_id?:string;
 }
 
 export interface RtspResponse {

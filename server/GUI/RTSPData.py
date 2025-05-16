@@ -130,12 +130,14 @@ class RTSPData:
             _ = await self.origin_frame_queue.get()
             await self.origin_frame_queue.put(frame)
 
+
 class HandleRTSPData:
     """已处理的RTSP流信息"""
-    def __init__(self,rtsp_url='',frame_url='',mjpeg_stream='',mjpeg_url='',name='hello'):
+    def __init__(self,rtsp_url='',frame_url='',mjpeg_stream='',mjpeg_url='',name='hello',stream_id=''):
         self.rtsp_url=rtsp_url
         self.frame_url=frame_url
         self.mjpeg_stream=mjpeg_stream  # 原始的mjpeg
         self.mjpeg_url=mjpeg_url  # 已处理的mjpeg
+        self.stream_id=stream_id
         self.name=name
         self.create_time=time.ctime()
