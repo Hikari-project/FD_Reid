@@ -8,6 +8,7 @@
 @Describe:
 '''
 import asyncio
+import queue
 from concurrent.futures import ThreadPoolExecutor
 from urllib.request import Request
 
@@ -96,7 +97,8 @@ app.mount(static_path[1:], StaticFiles(directory="static"), name="static")
 stream_objects = {}
 # 降低分辨率
 target_width = 1280
-
+# 全局变量存储推流状态
+stream_objects_rtsp = {}
 def _encode_frame( frame):
     """独立编码函数"""
     # 可在此处添加硬件加速逻辑
@@ -135,7 +137,6 @@ async def rtsp_generate_mjpeg(rtsp_url):
     #     width, height = min_width_px, new_h
     #     is_resize = True
 
-
     while True:
         try:
             ret, frame = cap.read()
@@ -158,6 +159,50 @@ async def rtsp_generate_mjpeg(rtsp_url):
         except Exception as e:
             print('rtsp_generate_mjpeg',str(e))
     cap.release()
+
+queue_rtsp_map={}
+queue_list=[asyncio.Queue(maxsize=5)for i in range(5)]
+queue_valid_map={}
+for i in range(len(queue_list)):
+    queue_valid_map[i]=True
+def getvalid_queue():
+    for key,value in queue_valid_map.items():
+        if value:
+            queue_valid_map[key]=False
+            return key
+
+async def read_rtsp(rtsp_url):
+    cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
+    cap.set(cv2.CAP_PROP_HW_ACCELERATION, cv2.VIDEO_ACCELERATION_ANY)
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 2)
+    cap.set(cv2.CAP_PROP_FPS, 25)
+    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('H', '2', '6', '5'))
+
+    valid_index = getvalid_queue()
+    queue_rtsp_map[rtsp_url] = valid_index
+
+    loop = asyncio.get_event_loop()
+    try:
+        while True:
+            # 异步执行阻塞的 read()
+            ret, frame = await loop.run_in_executor(None, cap.read)
+            if not ret:
+                break
+            await queue_list[valid_index].put(frame)
+            await asyncio.sleep(0.02)
+    finally:
+        cap.release()
+        queue_valid_map[valid_index] = True
+        del queue_rtsp_map[rtsp_url]
+async def generate_mjpegV2(rtsp_url):
+    """专门一个队列用于获取和推流"""
+    queue_index=queue_rtsp_map[rtsp_url]
+    while True:
+        frame=await queue_list[queue_index].get()
+        ret, jpeg = cv2.imencode('.jpg', frame)
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n\r\n')
+
 
 
 from RTSPData import HandleRTSPData
@@ -183,10 +228,12 @@ async def check_rtsp(rtsp:RTSP,db:Session=Depends(get_db)):
     # 创建MJPEG推流
     stream_objects[rtsp_data.stream_id]=rtsp_data.rtsp_url # 记录根据id转到对应的rtsp流
 
-    threading.Thread(target=lambda: StreamingResponse(
-        rtsp_generate_mjpeg(rtsp_data.rtsp_url),
-        media_type="multipart/x-mixed-replace;boundary=frame"
-    )).start()
+    # threading.Thread(target=lambda: StreamingResponse(
+    #     rtsp_generate_mjpeg(rtsp_data.rtsp_url),
+    #     media_type="multipart/x-mixed-replace;boundary=frame"
+    # )).start()
+
+    asyncio.create_task(read_rtsp(rtsp_data.rtsp_url))
 
     # 存储已处理信息
     hanle_rtsp_data=HandleRTSPData(rtsp_url=rtsp.rtsp_url,frame_url=f"/static/frames/{rtsp_data.stream_id}.jpg",mjpeg_stream=f"/customer-flow/video-stream/{rtsp_data.stream_id}",name=rtsp_data.name,stream_id=rtsp_data.stream_id)
@@ -202,7 +249,10 @@ async def check_rtsp(rtsp:RTSP,db:Session=Depends(get_db)):
         describes=f"开始检测RTSP流: {rtsp.rtsp_url}"
     )
     crud.create_log(db, start_log)
-
+    stream_objects_rtsp[rtsp_data.stream_id] = {
+        'rtsp_url': rtsp_data.rtsp_url,
+        'active': True
+    }
     return {
         "status": "success",
         "frame_id": rtsp_data.stream_id,
@@ -211,9 +261,19 @@ async def check_rtsp(rtsp:RTSP,db:Session=Depends(get_db)):
         "mjpeg_stream": f"/customer-flow/video-stream/{rtsp_data.stream_id}",
         "stream_id": rtsp_data.stream_id,
     }
-
-
 @app.get("/customer-flow/video-stream/{stream_id}")
+async def video_stream(stream_id: str):
+    if stream_id not in stream_objects_rtsp:
+        raise HTTPException(status_code=404, detail="推流不存在")
+
+    print(stream_id)
+    return StreamingResponse(
+        generate_mjpegV2(stream_objects_rtsp[stream_id]['rtsp_url']),
+        media_type="multipart/x-mixed-replace;boundary=frame"
+    )
+
+
+@app.get("/customer-flow/video-streamV2/{stream_id}")
 async def video_stream(stream_id: str):
     """推流默认视频流"""
     if stream_id not in stream_objects:
