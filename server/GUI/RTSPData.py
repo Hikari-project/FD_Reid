@@ -35,8 +35,6 @@ class RTSPData:
         self.height,self.width=self.screen_img.shape[:2]
 
 
-
-
         self.stop_event = threading.Event()
         # 启动rtsp自动解码线程
         self.mainloop = asyncio.get_event_loop()
@@ -61,6 +59,7 @@ class RTSPData:
             print(self.height, self.width)
             print(self.min_width_px, new_h)
             self.is_resize = True
+
 
 
     def _get_screen_frame(self):

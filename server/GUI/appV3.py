@@ -10,6 +10,7 @@
 import asyncio
 import queue
 from concurrent.futures import ThreadPoolExecutor
+from datetime import time
 from urllib.request import Request
 
 import fastapi
@@ -161,7 +162,7 @@ async def rtsp_generate_mjpeg(rtsp_url):
     cap.release()
 
 queue_rtsp_map={}
-queue_list=[asyncio.Queue(maxsize=5)for i in range(5)]
+queue_list=[asyncio.Queue(maxsize=5)for i in range(12)]
 queue_valid_map={}
 for i in range(len(queue_list)):
     queue_valid_map[i]=True
@@ -197,8 +198,28 @@ async def read_rtsp(rtsp_url):
 async def generate_mjpegV2(rtsp_url):
     """专门一个队列用于获取和推流"""
     queue_index=queue_rtsp_map[rtsp_url]
+    import time
+    start=time.time()
     while True:
         frame=await queue_list[queue_index].get()
+        fps=1/(time.time()-start)
+        print(f'rtsp:{rtsp_url},{fps:.2f}')
+        ret, jpeg = cv2.imencode('.jpg', frame)
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n\r\n')
+
+async def generate_mjpegV3(rtsp_url):
+    rtsp_data = app.state.rtsp_datas[rtsp_url]
+    """专门一个队列用于获取和推流"""
+    origin_frame_queue=rtsp_data.origin_frame_queue
+    import time
+    prestart=time.time()-2
+    while True:
+        frame= origin_frame_queue.get()
+        div=min(0.002,time.time()-prestart)
+        fps=1/div
+        prestart=time.time()
+        print(f'rtsp:{rtsp_url},{fps:.2f}')
         ret, jpeg = cv2.imencode('.jpg', frame)
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n\r\n')
@@ -210,6 +231,7 @@ from RTSPData import HandleRTSPData
 async def check_rtsp(rtsp:RTSP,db:Session=Depends(get_db)):
     # 实例化rtsp对象
     rtsp_data=RTSPData(rtsp.rtsp_url)
+
 
     # 通过stream_id查询rtsp
     app.state.stream_2_rtsp_dict[rtsp_data.stream_id]=rtsp_data.rtsp_url
@@ -248,6 +270,7 @@ async def check_rtsp(rtsp:RTSP,db:Session=Depends(get_db)):
         person_name="admin",
         describes=f"开始检测RTSP流: {rtsp.rtsp_url}"
     )
+
     crud.create_log(db, start_log)
     stream_objects_rtsp[rtsp_data.stream_id] = {
         'rtsp_url': rtsp_data.rtsp_url,
@@ -261,6 +284,7 @@ async def check_rtsp(rtsp:RTSP,db:Session=Depends(get_db)):
         "mjpeg_stream": f"/customer-flow/video-stream/{rtsp_data.stream_id}",
         "stream_id": rtsp_data.stream_id,
     }
+
 @app.get("/customer-flow/video-stream/{stream_id}")
 async def video_stream(stream_id: str):
     if stream_id not in stream_objects_rtsp:
@@ -268,7 +292,7 @@ async def video_stream(stream_id: str):
 
     print(stream_id)
     return StreamingResponse(
-        generate_mjpegV2(stream_objects_rtsp[stream_id]['rtsp_url']),
+        generate_mjpegV3(stream_objects_rtsp[stream_id]['rtsp_url']),
         media_type="multipart/x-mixed-replace;boundary=frame"
     )
 
@@ -303,6 +327,7 @@ async def custome_analysisV2(video_config:VideoConfig):
     print("videoData:", str(config))
 
     rtsp_data=app.state.rtsp_datas[config[0]['rtsp_url']]
+
     print(rtsp_data)
 
     # index=
@@ -324,6 +349,8 @@ async def stop_analysis(rtsp:RTSP):
 
     stream_id=app.state.rtsp_stream_id[rtsp.rtsp_url]
     await app.state.ws_manager.disconnect(stream_id)
+
+
     return {"ret":0,"message":"停止成功"}
 
 

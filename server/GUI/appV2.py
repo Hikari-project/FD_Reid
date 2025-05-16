@@ -479,8 +479,6 @@ async def check_rtsp(rtsp: RTSP):
 
 
 
-
-
 @app.get("/customer-flow/video-stream/{stream_id}")
 async def video_stream(stream_id: str):
     if stream_id not in stream_objects:
