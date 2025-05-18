@@ -219,6 +219,26 @@ class ReIDTracker:
             # 从第二个点开始，依次连接到最后一个点和第一个点
             next_point = self.rect_points[(i + 1) % num_points]
             self.side_lines.append(LineString([self.rect_points[i], next_point]))
+            
+        # Create an expanded ROI polygon that is 1.3 times larger than the original area
+        # First calculate the centroid of the original polygon
+        centroid_x = sum(p[0] for p in self.rect_points) / len(self.rect_points)
+        centroid_y = sum(p[1] for p in self.rect_points) / len(self.rect_points)
+        
+        # Scale each point from the centroid by a factor of 1.3
+        expanded_points = []
+        for point in self.rect_points:
+            # Vector from centroid to point
+            vector_x = point[0] - centroid_x
+            vector_y = point[1] - centroid_y
+            
+            # Scale the vector by 1.3
+            scaled_x = centroid_x + vector_x * 1.3
+            scaled_y = centroid_y + vector_y * 1.3
+            
+            expanded_points.append((scaled_x, scaled_y))
+        
+        self.area_polygon_roi = Polygon(expanded_points)
 
     def _draw_rois(self, frame, json_data):
         """绘制门店前部区域"""
@@ -592,13 +612,11 @@ class ReIDTracker:
                 # 更新最后可见时间
                 self.last_seen[track_id] = time.time()
 
-                # 更新轨迹历史和区域状态
-                self._update_track_history_and_status(track_id, x_center, y_center, curr_in_area, curr_point, info)
-
                 # 位置更新 - 使用IDDict进行状态管理
+                if self.area_polygon_roi.contains(curr_point):
+                    event = self.id_dict.add_update(track_id, 'cam1', x_center, y_center, reid_id=person_id)
+                    self._update_track_history_and_status(track_id, x_center, y_center, curr_in_area, curr_point, info)
                 person_id = track_info.person_id if track_info.person_id != -1 else track_id
-                event = self.id_dict.add_update(track_id, 'cam1', x_center, y_center, reid_id=person_id)
-
                 # 处理事件和ReID
                 if event:
                     self._process_event_and_reid(event, track_id, track_info, frame, bbox,
@@ -888,6 +906,42 @@ class ReIDTracker:
 
         if event_type == 'enter':
             self.re_load_search_engine()
+            self.model.predict(frame, bbox, conf=0.6)
+            # Get detected person body bounding boxes
+            body_results = self.model.predict(frame, conf=0.6, classes=[0])
+            if body_results and len(body_results) > 0:
+                body_boxes = body_results[0].boxes.xyxy.cpu().numpy() if body_results[0].boxes.xyxy is not None else []
+                
+                # Match head bbox with body bbox based on IoU and position
+                if len(body_boxes) > 0:
+                    head_box = bbox  # Current head bbox
+                    head_center_x = (head_box[0] + head_box[2]) / 2
+                    
+                    # Find the best matching body box for the head
+                    best_match = None
+                    best_score = 0
+                    
+                    for body_box in body_boxes:
+                        # Check if head is above and within width of body
+                        if (head_box[3] <= (body_box[1] + (body_box[3] - body_box[1]) * 0.4) and  # Head is in upper 40% of body
+                            head_center_x >= body_box[0] and 
+                            head_center_x <= body_box[2]):
+                            
+                            # Calculate overlap score based on horizontal alignment and proximity
+                            width_overlap = min(1.0, (min(head_box[2], body_box[2]) - max(head_box[0], body_box[0])) / 
+                                               (head_box[2] - head_box[0]))
+                            vertical_dist = max(0, head_box[3] - body_box[1])
+                            score = width_overlap * (1 - vertical_dist / max(1, body_box[3] - body_box[1]))
+                            
+                            if score > best_score:
+                                best_score = score
+                                best_match = body_box
+                    
+                    # If we found a good match, use the body box for better feature extraction
+                    if best_match is not None :
+                        # Use matched body box for feature extraction instead of head box
+                        bbox = best_match
+                        print(f"Matched head with body for track_id {track_id}, score: {best_score:.2f}")
             if conf > 0.8:
                 # ReID处理
                 if not track_info.is_reid:
