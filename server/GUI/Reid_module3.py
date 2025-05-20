@@ -616,8 +616,9 @@ class ReIDTracker:
                 if self.area_polygon_roi.contains(curr_point):
                     event = self.id_dict.add_update(track_id, 'cam1', x_center, y_center, reid_id=person_id)
                     self._update_track_history_and_status(track_id, x_center, y_center, curr_in_area, curr_point, info)
+                else:
+                    event = None
                 person_id = track_info.person_id if track_info.person_id != -1 else track_id
-                # 处理事件和ReID
                 if event:
                     self._process_event_and_reid(event, track_id, track_info, frame, bbox,
                                                  quality_score, conf, match_thresh, info)
@@ -906,9 +907,7 @@ class ReIDTracker:
 
         if event_type == 'enter':
             self.re_load_search_engine()
-            self.model.predict(frame, bbox, conf=0.6)
-            # Get detected person body bounding boxes
-            body_results = self.model.predict(frame, conf=0.6, classes=[0])
+            body_results = self.model.predict(frame, conf=0.6, classes=[2])
             if body_results and len(body_results) > 0:
                 body_boxes = body_results[0].boxes.xyxy.cpu().numpy() if body_results[0].boxes.xyxy is not None else []
                 
