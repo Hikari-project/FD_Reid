@@ -618,8 +618,12 @@ class ReIDTracker:
                     self._update_track_history_and_status(track_id, x_center, y_center, curr_in_area, curr_point, info)
                 else:
                     event = None
+<<<<<<< HEAD
 
                 # 处理事件和ReID
+=======
+                person_id = track_info.person_id if track_info.person_id != -1 else track_id
+>>>>>>> 6e438428e1880365be67dfb0b333a7b5c9450177
                 if event:
                     self._process_event_and_reid(event, track_id, track_info, frame, bbox,
                                                  quality_score, conf, match_thresh, info)
@@ -908,8 +912,11 @@ class ReIDTracker:
 
         if event_type == 'enter':
             self.re_load_search_engine()
+<<<<<<< HEAD
             self.model.predict(frame, conf=0.6)
             # Get detected person body bounding boxes
+=======
+>>>>>>> 6e438428e1880365be67dfb0b333a7b5c9450177
             body_results = self.model.predict(frame, conf=0.6, classes=[2])
             if body_results and len(body_results) > 0:
                 body_boxes = body_results[0].boxes.xyxy.cpu().numpy() if body_results[0].boxes.xyxy is not None else []
