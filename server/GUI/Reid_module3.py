@@ -611,12 +611,14 @@ class ReIDTracker:
 
                 # 更新最后可见时间
                 self.last_seen[track_id] = time.time()
-
+                person_id = track_info.person_id if track_info.person_id != -1 else track_id
                 # 位置更新 - 使用IDDict进行状态管理
                 if self.area_polygon_roi.contains(curr_point):
                     event = self.id_dict.add_update(track_id, 'cam1', x_center, y_center, reid_id=person_id)
                     self._update_track_history_and_status(track_id, x_center, y_center, curr_in_area, curr_point, info)
-                person_id = track_info.person_id if track_info.person_id != -1 else track_id
+                else:
+                    event = None
+
                 # 处理事件和ReID
                 if event:
                     self._process_event_and_reid(event, track_id, track_info, frame, bbox,
@@ -906,40 +908,44 @@ class ReIDTracker:
 
         if event_type == 'enter':
             self.re_load_search_engine()
-            self.model.predict(frame, bbox, conf=0.6)
+            self.model.predict(frame, conf=0.6)
             # Get detected person body bounding boxes
-            body_results = self.model.predict(frame, conf=0.6, classes=[0])
+            body_results = self.model.predict(frame, conf=0.6, classes=[2])
             if body_results and len(body_results) > 0:
                 body_boxes = body_results[0].boxes.xyxy.cpu().numpy() if body_results[0].boxes.xyxy is not None else []
                 
-                # Match head bbox with body bbox based on IoU and position
+                # Match head bbox with body bbox based on containment and position
                 if len(body_boxes) > 0:
                     head_box = bbox  # Current head bbox
                     head_center_x = (head_box[0] + head_box[2]) / 2
+                    head_center_y = (head_box[1] + head_box[3]) / 2
                     
-                    # Find the best matching body box for the head
-                    best_match = None
-                    best_score = 0
+                    # Find candidate body boxes that might contain this head
+                    candidate_bodies = []
                     
                     for body_box in body_boxes:
-                        # Check if head is above and within width of body
-                        if (head_box[3] <= (body_box[1] + (body_box[3] - body_box[1]) * 0.4) and  # Head is in upper 40% of body
-                            head_center_x >= body_box[0] and 
-                            head_center_x <= body_box[2]):
+                        # First check: is the head horizontally contained within the body
+                        if (head_center_x >= body_box[0] and head_center_x <= body_box[2]):
+                            # Check vertical position - head should be in top part of body
+                            body_height = body_box[3] - body_box[1]
+                            head_relative_pos = (head_center_y - body_box[1]) / body_height
                             
-                            # Calculate overlap score based on horizontal alignment and proximity
-                            width_overlap = min(1.0, (min(head_box[2], body_box[2]) - max(head_box[0], body_box[0])) / 
-                                               (head_box[2] - head_box[0]))
-                            vertical_dist = max(0, head_box[3] - body_box[1])
-                            score = width_overlap * (1 - vertical_dist / max(1, body_box[3] - body_box[1]))
-                            
-                            if score > best_score:
-                                best_score = score
-                                best_match = body_box
+                            # Head should be in top 40% of the body
+                            if head_relative_pos <= 0.4:
+                                # Calculate match score based on position
+                                horizontal_alignment = 1.0 - abs(((head_box[0] + head_box[2]) / 2 - 
+                                                              (body_box[0] + body_box[2]) / 2)) / ((body_box[2] - body_box[0]) / 2)
+                                vertical_score = 1.0 - (head_relative_pos / 0.4)
+                                match_score = horizontal_alignment * 0.6 + vertical_score * 0.4
+                                
+                                candidate_bodies.append((body_box, match_score))
                     
-                    # If we found a good match, use the body box for better feature extraction
-                    if best_match is not None :
-                        # Use matched body box for feature extraction instead of head box
+                    # Sort candidates by score and select the best one
+                    if candidate_bodies:
+                        candidate_bodies.sort(key=lambda x: x[1], reverse=True)
+                        best_match, best_score = candidate_bodies[0]
+                        
+                        # Use the best matching body box for feature extraction
                         bbox = best_match
                         print(f"Matched head with body for track_id {track_id}, score: {best_score:.2f}")
             if conf > 0.8:
@@ -1219,63 +1225,50 @@ if __name__ == "__main__":
     # 初始化日志系统
     log_system = LogSystem()
 
-    # 默认视频源（如果未指定）
-    if not args.video_paths:
-        # 提供一些默认视频路径
-        default_videos = [
-            os.path.join(project_root, 'GUI/data/FD_new/1.mp4'),
-            os.path.join(project_root, 'GUI/data/FD_new/2.mp4'),
-            os.path.join(project_root, 'GUI/data/FD_new/3.mp4'),
-            os.path.join(project_root, 'GUI/data/FD_new/4.mp4')
-        ]
 
-        # 检查默认视频是否存在，如果不存在则使用摄像头
-        validated_videos = []
-        for video in default_videos:
-            if os.path.exists(video):
-                validated_videos.append(video)
-                print(f"已找到默认视频: {video}")
-            else:
-                print(f"默认视频不存在: {video}")
+    # 视频路径
+    video_path = r"E:\OneDrive - CUHK-Shenzhen\FE大二下\方度\FD_Reid_Web\server\GUI\data\FD_new\1.mp4"
 
-        # 如果找不到任何视频，使用摄像头索引
-        if not validated_videos:
-            print("未找到默认视频，将使用摄像头")
-            validated_videos = [0, 1, 2, 3]  # 使用摄像头索引
+    # 初始化ReIDTracker
+    tracker = ReIDTracker(log_system=log_system)
 
-        args.video_paths = validated_videos
+    # 设置处理环境
+    json_data = {
+        "b1": [[400, 500], [800, 500]],  # 下边缘线
+        "b2": [[450, 450], [850, 450]],  # 下边缘上方的线
+        "g2": [[500, 400], [900, 400]],  # 下边缘更上方的线
+        "points": [[500, 300], [900, 300], [900, 700], [500, 700]]  # 中心的ROI区域
+    }
+    if not tracker.setup_processing(video_path=video_path, json_data=json_data):
+        print("初始化处理环境失败")
+        sys.exit(1)
 
-    # 确保不超过4个视频源
-    if len(args.video_paths) > 4:
-        print(f"警告: 指定了超过4个视频源，将仅使用前4个")
-        args.video_paths = args.video_paths[:4]
+    # 设置视频写入器（可选）
+    if args.save_video:
+        if not tracker.setup_video_writer(video_path=video_path):
+            print("初始化视频写入器失败")
+            sys.exit(1)
 
-    # 检查配置文件是否存在
-    config_path = args.config
-    if not os.path.exists(config_path):
-        print(f"警告: 配置文件 {config_path} 不存在，将创建默认配置")
-        # 创建默认配置
-        config = {
-            "b1": [[500, 600], [750, 600]],
-            "b2": [[750, 600], [750, 400]],
-            "g2": [[750, 400], [500, 400]],
-            "points": [[500, 600], [750, 600], [750, 400], [500, 400]]
-        }
+    # 逐帧处理视频
+    while True:
+        ret, frame = tracker.cap.read()
+        if not ret:
+            print("视频处理完成")
+            break
 
-        # 保存配置文件
-        with open(config_path, 'w') as f:
-            import json
+        # 调用process_frame处理每一帧
+        output_frame, info, result = tracker.process_frame(frame, skip_frames=args.skip_frames, match_thresh=args.match_thresh)
 
-            json.dump(config, f)
+        # 打印结果信息
+        if 'error' in info:
+            print(f"处理帧时出错: {info['error']}")
+            break
+        print(f"当前帧信息: {result}")
 
-        print(f"已创建默认配置文件: {config_path}")
-    else:
-        print(f"使用现有配置文件: {config_path}")
+        # 显示处理后的帧（可选）
+        cv2.imshow("Processed Frame", output_frame)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
 
-    # 创建多个跟踪器并在线程中运行
-    trackers = []
-    threads = []
-
-    import threading
-
-
+    # 释放资源
+    tracker.release()
