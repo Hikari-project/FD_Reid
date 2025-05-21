@@ -560,13 +560,13 @@ class StreamManager:
             # cv2.imshow('process_frame', frame)
             # cv2.waitKey(1)
             # 检查是否支持CUDA
-            if cv2.cuda.getCudaEnabledDeviceCount() > 0:
-                gpu_frame = cv2.cuda_GpuMat()
-                gpu_frame.upload(frame)
-                # 使用GPU编码
-                _, buffer = cv2.imencode('.jpg', gpu_frame.download())
-            else:
-                _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
+            # if cv2.cuda.getCudaEnabledDeviceCount() > 0:
+            #     gpu_frame = cv2.cuda_GpuMat()
+            #     gpu_frame.upload(frame)
+            #     # 使用GPU编码
+            #     _, buffer = cv2.imencode('.jpg', gpu_frame.download())
+            # else:
+            #     _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
 
             # 将编码任务提交到线程池
             _frame_cache = await loop.run_in_executor(

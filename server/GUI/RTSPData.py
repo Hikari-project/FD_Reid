@@ -20,7 +20,7 @@ class RTSPData:
     """
     RTSPData RTSP流数据实例化
     """
-    def __init__(self ,rtsp_url,max_num=10,name=''):
+    def __init__(self ,rtsp_url,max_num=1,name=''):
 
         # 创建链接
         self.cap=cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
