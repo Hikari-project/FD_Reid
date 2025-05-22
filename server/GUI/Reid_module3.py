@@ -618,12 +618,8 @@ class ReIDTracker:
                     self._update_track_history_and_status(track_id, x_center, y_center, curr_in_area, curr_point, info)
                 else:
                     event = None
-<<<<<<< HEAD
 
                 # 处理事件和ReID
-=======
-                person_id = track_info.person_id if track_info.person_id != -1 else track_id
->>>>>>> 6e438428e1880365be67dfb0b333a7b5c9450177
                 if event:
                     self._process_event_and_reid(event, track_id, track_info, frame, bbox,
                                                  quality_score, conf, match_thresh, info)
@@ -912,15 +908,12 @@ class ReIDTracker:
 
         if event_type == 'enter':
             self.re_load_search_engine()
-<<<<<<< HEAD
-            self.model.predict(frame, conf=0.6)
+            
             # Get detected person body bounding boxes
-=======
->>>>>>> 6e438428e1880365be67dfb0b333a7b5c9450177
             body_results = self.model.predict(frame, conf=0.6, classes=[2])
             if body_results and len(body_results) > 0:
                 body_boxes = body_results[0].boxes.xyxy.cpu().numpy() if body_results[0].boxes.xyxy is not None else []
-                
+                confs = body_results[0].boxes.conf.cpu().numpy() if body_results[0].boxes.conf is not None else []
                 # Match head bbox with body bbox based on containment and position
                 if len(body_boxes) > 0:
                     head_box = bbox  # Current head bbox
@@ -955,7 +948,7 @@ class ReIDTracker:
                         # Use the best matching body box for feature extraction
                         bbox = best_match
                         print(f"Matched head with body for track_id {track_id}, score: {best_score:.2f}")
-            if conf > 0.8:
+            if conf > 0.78:
                 # ReID处理
                 if not track_info.is_reid:
                     _feat_list = self.reid_pipeline.SingleExtract(frame, bbox)
@@ -1234,18 +1227,70 @@ if __name__ == "__main__":
 
 
     # 视频路径
-    video_path = r"E:\OneDrive - CUHK-Shenzhen\FE大二下\方度\FD_Reid_Web\server\GUI\data\FD_new\1.mp4"
+    video_path = r"E:\OneDrive - CUHK-Shenzhen\FE大二下\方度\FD_Reid_Web\server\GUI\data\FD_new\6.mp4"
 
     # 初始化ReIDTracker
     tracker = ReIDTracker(log_system=log_system)
 
     # 设置处理环境
     json_data = {
-        "b1": [[400, 500], [800, 500]],  # 下边缘线
-        "b2": [[450, 450], [850, 450]],  # 下边缘上方的线
-        "g2": [[500, 400], [900, 400]],  # 下边缘更上方的线
-        "points": [[500, 300], [900, 300], [900, 700], [500, 700]]  # 中心的ROI区域
-    }
+  "b1": [
+    [
+      594,
+      215
+    ],
+    [
+      772,
+      220
+    ]
+  ],
+  "b2": [
+    [
+      619,
+      145
+    ],
+    [
+      618,
+      215
+    ]
+  ],
+  "g2": [
+    [
+      747,
+      138
+    ],
+    [
+      737,
+      225
+    ]
+  ],
+  "points": [
+    [
+      594,
+      215
+    ],
+    [
+      618,
+      215
+    ],
+    [
+      737,
+      225
+    ],
+    [
+      772,
+      220
+    ],
+    [
+      747,
+      138
+    ],
+    [
+      619,
+      145
+    ]
+  ]
+}
     if not tracker.setup_processing(video_path=video_path, json_data=json_data):
         print("初始化处理环境失败")
         sys.exit(1)
