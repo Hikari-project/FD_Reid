@@ -93,7 +93,7 @@ json.dumps = np_dumps
 
 
 class ReIDTracker:
-    def __init__(self, log_system=None):
+    def __init__(self, log_system=None,rtsp_url=''):
         """初始化ReID跟踪器"""
         self.reid_pipeline = None
         self.track_manager = None
@@ -155,6 +155,7 @@ class ReIDTracker:
 
         # 保存渲染行人的队列
         self.had_search_trackid_list=[[],[],[]]
+        self.rtsp_url=rtsp_url
 
         # 存放上一帧处理的数据信息
         self.pre_data=None
@@ -218,6 +219,26 @@ class ReIDTracker:
             # 从第二个点开始，依次连接到最后一个点和第一个点
             next_point = self.rect_points[(i + 1) % num_points]
             self.side_lines.append(LineString([self.rect_points[i], next_point]))
+            
+        # Create an expanded ROI polygon that is 1.3 times larger than the original area
+        # First calculate the centroid of the original polygon
+        centroid_x = sum(p[0] for p in self.rect_points) / len(self.rect_points)
+        centroid_y = sum(p[1] for p in self.rect_points) / len(self.rect_points)
+        
+        # Scale each point from the centroid by a factor of 1.3
+        expanded_points = []
+        for point in self.rect_points:
+            # Vector from centroid to point
+            vector_x = point[0] - centroid_x
+            vector_y = point[1] - centroid_y
+            
+            # Scale the vector by 1.3
+            scaled_x = centroid_x + vector_x * 1.3
+            scaled_y = centroid_y + vector_y * 1.3
+            
+            expanded_points.append((scaled_x, scaled_y))
+        
+        self.area_polygon_roi = Polygon(expanded_points)
 
     def _draw_rois(self, frame, json_data):
         """绘制门店前部区域"""
@@ -466,7 +487,7 @@ class ReIDTracker:
         )
         print("搜索引擎已重新加载")
 
-    def process_frame(self, frame=None, skip_frames=2, match_thresh=0.15, is_track=True):
+    def process_frame(self, frame=None, skip_frames=1, match_thresh=0.15, is_track=True):
         """
         处理单帧图像
 
@@ -489,7 +510,9 @@ class ReIDTracker:
             ret, frame = self.cap.read()
             if not ret:
                 return None, {'error': 'End of video'}
-
+        skip_frames=1
+        outresult={}
+        boxes_res=[]
         # 确保已经设置了处理环境
         if not hasattr(self, 'id_dict') or self.id_dict is None:
             print("错误: 未初始化处理环境，请先调用setup_processing")
@@ -505,6 +528,7 @@ class ReIDTracker:
             'tracks': [],
             'events': []
         }
+
 
         # 跳帧处理
         if skip_frames > 0 and self.frame_count % skip_frames != 0:
@@ -557,7 +581,7 @@ class ReIDTracker:
         self.track_manager.update_tracks(track_ids if track_ids is not None else [])
 
         had_search_trackid_list = []
-
+        box_id=0
         # 如果启用了跟踪
         if is_track and track_ids is not None and len(track_ids) > 0:
             for bbox, track_id, conf in zip(boxes, track_ids, confs):
@@ -587,13 +611,13 @@ class ReIDTracker:
 
                 # 更新最后可见时间
                 self.last_seen[track_id] = time.time()
-
-                # 更新轨迹历史和区域状态
-                self._update_track_history_and_status(track_id, x_center, y_center, curr_in_area, curr_point, info)
-
-                # 位置更新 - 使用IDDict进行状态管理
                 person_id = track_info.person_id if track_info.person_id != -1 else track_id
-                event = self.id_dict.add_update(track_id, 'cam1', x_center, y_center, reid_id=person_id)
+                # 位置更新 - 使用IDDict进行状态管理
+                if self.area_polygon_roi.contains(curr_point):
+                    event = self.id_dict.add_update(track_id, 'cam1', x_center, y_center, reid_id=person_id)
+                    self._update_track_history_and_status(track_id, x_center, y_center, curr_in_area, curr_point, info)
+                else:
+                    event = None
 
                 # 处理事件和ReID
                 if event:
@@ -617,6 +641,8 @@ class ReIDTracker:
                     'position': (x_center, y_center),
                     'in_area': curr_in_area
                 })
+                boxes_res.append({"id":box_id,"label":"head","bbox":[int(bbox[0]),int(bbox[1]),int(bbox[2]-bbox[0]),int(bbox[3]-bbox[1])],"confidence":round(conf,2)})
+                box_id+=1
             self.had_search_trackid_list=had_search_trackid_list
             output_frame = self._draw_match(frame.copy(),
                                             [row[0] for row in had_search_trackid_list],  # boxes
@@ -644,8 +670,6 @@ class ReIDTracker:
         self._draw_text_info(output_frame)
 
 
-
-
         # 保存视频
         if hasattr(self, 'video_writer') and self.video_writer is not None:
             self.video_writer.write(output_frame)
@@ -658,7 +682,19 @@ class ReIDTracker:
 
         counts = self.log_system.get_counts()
         info['counts'] = counts
-        return output_frame, info
+
+
+        count_res={
+            "enter_count":counts['enter'],
+            "exit_count":counts['exit'],
+            "Pass_count":counts['pass'],
+            "re_enter_count":counts['re_enter'],
+        }
+
+        outresult={"source_url":self.rtsp_url,"result":count_res,"timestamp":int(time.time()),"boxes":boxes_res}
+
+        return output_frame, info,outresult
+
     def _draw_text_info(self,frame):
         counts = self.log_system.get_counts()
         height, width = frame.shape[:2]
@@ -872,7 +908,47 @@ class ReIDTracker:
 
         if event_type == 'enter':
             self.re_load_search_engine()
-            if conf > 0.8:
+            
+            # Get detected person body bounding boxes
+            body_results = self.model.predict(frame, conf=0.6, classes=[2])
+            if body_results and len(body_results) > 0:
+                body_boxes = body_results[0].boxes.xyxy.cpu().numpy() if body_results[0].boxes.xyxy is not None else []
+                confs = body_results[0].boxes.conf.cpu().numpy() if body_results[0].boxes.conf is not None else []
+                # Match head bbox with body bbox based on containment and position
+                if len(body_boxes) > 0:
+                    head_box = bbox  # Current head bbox
+                    head_center_x = (head_box[0] + head_box[2]) / 2
+                    head_center_y = (head_box[1] + head_box[3]) / 2
+                    
+                    # Find candidate body boxes that might contain this head
+                    candidate_bodies = []
+                    
+                    for body_box in body_boxes:
+                        # First check: is the head horizontally contained within the body
+                        if (head_center_x >= body_box[0] and head_center_x <= body_box[2]):
+                            # Check vertical position - head should be in top part of body
+                            body_height = body_box[3] - body_box[1]
+                            head_relative_pos = (head_center_y - body_box[1]) / body_height
+                            
+                            # Head should be in top 40% of the body
+                            if head_relative_pos <= 0.4:
+                                # Calculate match score based on position
+                                horizontal_alignment = 1.0 - abs(((head_box[0] + head_box[2]) / 2 - 
+                                                              (body_box[0] + body_box[2]) / 2)) / ((body_box[2] - body_box[0]) / 2)
+                                vertical_score = 1.0 - (head_relative_pos / 0.4)
+                                match_score = horizontal_alignment * 0.6 + vertical_score * 0.4
+                                
+                                candidate_bodies.append((body_box, match_score))
+                    
+                    # Sort candidates by score and select the best one
+                    if candidate_bodies:
+                        candidate_bodies.sort(key=lambda x: x[1], reverse=True)
+                        best_match, best_score = candidate_bodies[0]
+                        
+                        # Use the best matching body box for feature extraction
+                        bbox = best_match
+                        print(f"Matched head with body for track_id {track_id}, score: {best_score:.2f}")
+            if conf > 0.78:
                 # ReID处理
                 if not track_info.is_reid:
                     _feat_list = self.reid_pipeline.SingleExtract(frame, bbox)
@@ -1149,63 +1225,102 @@ if __name__ == "__main__":
     # 初始化日志系统
     log_system = LogSystem()
 
-    # 默认视频源（如果未指定）
-    if not args.video_paths:
-        # 提供一些默认视频路径
-        default_videos = [
-            os.path.join(project_root, 'GUI/data/FD_new/1.mp4'),
-            os.path.join(project_root, 'GUI/data/FD_new/2.mp4'),
-            os.path.join(project_root, 'GUI/data/FD_new/3.mp4'),
-            os.path.join(project_root, 'GUI/data/FD_new/4.mp4')
-        ]
 
-        # 检查默认视频是否存在，如果不存在则使用摄像头
-        validated_videos = []
-        for video in default_videos:
-            if os.path.exists(video):
-                validated_videos.append(video)
-                print(f"已找到默认视频: {video}")
-            else:
-                print(f"默认视频不存在: {video}")
+    # 视频路径
+    video_path = r"E:\OneDrive - CUHK-Shenzhen\FE大二下\方度\FD_Reid_Web\server\GUI\data\FD_new\6.mp4"
 
-        # 如果找不到任何视频，使用摄像头索引
-        if not validated_videos:
-            print("未找到默认视频，将使用摄像头")
-            validated_videos = [0, 1, 2, 3]  # 使用摄像头索引
+    # 初始化ReIDTracker
+    tracker = ReIDTracker(log_system=log_system)
 
-        args.video_paths = validated_videos
+    # 设置处理环境
+    json_data = {
+  "b1": [
+    [
+      594,
+      215
+    ],
+    [
+      772,
+      220
+    ]
+  ],
+  "b2": [
+    [
+      619,
+      145
+    ],
+    [
+      618,
+      215
+    ]
+  ],
+  "g2": [
+    [
+      747,
+      138
+    ],
+    [
+      737,
+      225
+    ]
+  ],
+  "points": [
+    [
+      594,
+      215
+    ],
+    [
+      618,
+      215
+    ],
+    [
+      737,
+      225
+    ],
+    [
+      772,
+      220
+    ],
+    [
+      747,
+      138
+    ],
+    [
+      619,
+      145
+    ]
+  ]
+}
+    if not tracker.setup_processing(video_path=video_path, json_data=json_data):
+        print("初始化处理环境失败")
+        sys.exit(1)
 
-    # 确保不超过4个视频源
-    if len(args.video_paths) > 4:
-        print(f"警告: 指定了超过4个视频源，将仅使用前4个")
-        args.video_paths = args.video_paths[:4]
+    # 设置视频写入器（可选）
+    if args.save_video:
+        if not tracker.setup_video_writer(video_path=video_path):
+            print("初始化视频写入器失败")
+            sys.exit(1)
 
-    # 检查配置文件是否存在
-    config_path = args.config
-    if not os.path.exists(config_path):
-        print(f"警告: 配置文件 {config_path} 不存在，将创建默认配置")
-        # 创建默认配置
-        config = {
-            "b1": [[500, 600], [750, 600]],
-            "b2": [[750, 600], [750, 400]],
-            "g2": [[750, 400], [500, 400]],
-            "points": [[500, 600], [750, 600], [750, 400], [500, 400]]
-        }
+    # 逐帧处理视频
+    while True:
+        ret, frame = tracker.cap.read()
+        if not ret:
+            print("视频处理完成")
+            break
 
-        # 保存配置文件
-        with open(config_path, 'w') as f:
-            import json
+        # 调用process_frame处理每一帧
+        output_frame, info, result = tracker.process_frame(frame, skip_frames=args.skip_frames, match_thresh=args.match_thresh)
 
-            json.dump(config, f)
+        # 打印结果信息
+        if 'error' in info:
+            print(f"处理帧时出错: {info['error']}")
+            break
+        print(f"当前帧信息: {result}")
 
-        print(f"已创建默认配置文件: {config_path}")
-    else:
-        print(f"使用现有配置文件: {config_path}")
+        # 显示处理后的帧（可选）
+        cv2.imshow("Processed Frame", output_frame)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
 
-    # 创建多个跟踪器并在线程中运行
-    trackers = []
-    threads = []
-
-    import threading
-
-
+    # 释放资源
+    tracker.release()
